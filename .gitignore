@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# segredos
+.env
+
+# Node / dashboard
+node_modules/
+dist/
+build/
+
+# editor / SO
+.vscode/
+.DS_Store

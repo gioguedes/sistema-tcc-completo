@@ -1,0 +1,6 @@
+paho-mqtt
+SQLAlchemy
+alembic
+psycopg[binary]
+python-dotenv
+pydantic
