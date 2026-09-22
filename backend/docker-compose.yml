@@ -1,0 +1,22 @@
+services:
+  timescaledb:
+    image: timescale/timescaledb:2.27.0-pg18
+    container_name: piscicultura-timescaledb
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-piscicultura}
+      POSTGRES_USER: ${DB_USER:-piscicultura}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-piscicultura}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-piscicultura} -d ${DB_NAME:-piscicultura}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  timescaledb_data:
