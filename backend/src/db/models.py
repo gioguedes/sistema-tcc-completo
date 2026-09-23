@@ -10,6 +10,7 @@ from sqlalchemy import (
     Index,
     Numeric,
     String,
+    UniqueConstraint,
     text,
 )
 from sqlalchemy.dialects.postgresql import INET
@@ -138,6 +139,7 @@ class Leitura(Base):
         CheckConstraint("valor BETWEEN -50 AND 3000", name="ck_leit_valor"),
         Index("ix_leituras_sensor_ts", "id_sensor", text("ts DESC")),
         Index("leituras_ts_idx", text("ts DESC")),
+        UniqueConstraint("id_sensor", "ts", name="uq_leituras_sensor_ts"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
