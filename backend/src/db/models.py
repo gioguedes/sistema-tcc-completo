@@ -1,13 +1,16 @@
 from datetime import date, datetime
 
 from sqlalchemy import (
+    BigInteger,
     CheckConstraint,
     Date,
     DateTime,
     ForeignKey,
     Identity,
+    Index,
     Numeric,
     String,
+    text,
 )
 from sqlalchemy.dialects.postgresql import INET
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
@@ -23,7 +26,7 @@ class Usuario(Base):
         CheckConstraint("perfil IN ('admin','operador')", name="ck_usuarios_perfil"),
     )
 
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     nome: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(160), unique=True)
     senha_hash: Mapped[str] = mapped_column(String(255))
@@ -42,7 +45,7 @@ class Especie(Base):
         CheckConstraint("od_min >= 0 AND od_max <= 20 AND od_min < od_max", name="ck_especies_od"),
     )
 
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     nome_comum: Mapped[str] = mapped_column(String(120))
     nome_cientifico: Mapped[str] = mapped_column(String(160), unique=True)
     ph_min: Mapped[float] = mapped_column(Numeric(4, 2))
@@ -61,9 +64,13 @@ class Tanque(Base):
         CheckConstraint("status IN ('ativo','manutencao','inativo')", name="ck_tanques_status"),
     )
 
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
-    id_usuario: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"))
-    id_especie: Mapped[int | None] = mapped_column(ForeignKey("especies.id", ondelete="SET NULL"))
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id_usuario: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("usuarios.id", ondelete="CASCADE")
+    )
+    id_especie: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("especies.id", ondelete="SET NULL")
+    )
     nome: Mapped[str] = mapped_column(String(120))
     volume_litros: Mapped[float] = mapped_column(Numeric(8, 2))
     quantidade_peixes: Mapped[int]
@@ -78,8 +85,10 @@ class Dispositivo(Base):
         CheckConstraint("status_conexao IN ('online','offline')", name="ck_disp_conexao"),
     )
 
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
-    id_tanque: Mapped[int] = mapped_column(ForeignKey("tanques.id", ondelete="CASCADE"))
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id_tanque: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tanques.id", ondelete="CASCADE")
+    )
     nome: Mapped[str] = mapped_column(String(120))
     modelo_esp32: Mapped[str] = mapped_column(String(60))
     mac_address: Mapped[str] = mapped_column(String(17), unique=True)
@@ -97,7 +106,7 @@ class TipoSensor(Base):
         CheckConstraint("faixa_min < faixa_max", name="ck_tipos_faixa"),
     )
 
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     grandeza: Mapped[str] = mapped_column(String(30))
     modelo: Mapped[str] = mapped_column(String(80), unique=True)
     unidade: Mapped[str] = mapped_column(String(20))
@@ -111,10 +120,14 @@ class Sensor(Base):
         CheckConstraint("status IN ('ativo','inativo','em_calibracao')", name="ck_sens_status"),
     )
 
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
-    id_dispositivo: Mapped[int] = mapped_column(ForeignKey("dispositivos.id", ondelete="CASCADE"))
-    id_tipo: Mapped[int] = mapped_column(ForeignKey("tipos_sensor.id"))
-    id_tanque: Mapped[int] = mapped_column(ForeignKey("tanques.id", ondelete="CASCADE"))
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id_dispositivo: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("dispositivos.id", ondelete="CASCADE")
+    )
+    id_tipo: Mapped[int] = mapped_column(BigInteger, ForeignKey("tipos_sensor.id"))
+    id_tanque: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tanques.id", ondelete="CASCADE")
+    )
     data_instalacao: Mapped[date] = mapped_column(Date)
     status: Mapped[str] = mapped_column(String(20))
 
@@ -123,10 +136,14 @@ class Leitura(Base):
     __tablename__ = "leituras"
     __table_args__ = (
         CheckConstraint("valor BETWEEN -50 AND 3000", name="ck_leit_valor"),
+        Index("ix_leituras_sensor_ts", "id_sensor", text("ts DESC")),
+        Index("leituras_ts_idx", text("ts DESC")),
     )
 
-    id: Mapped[int] = mapped_column(Identity(always=True), primary_key=True)
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
     ts: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
-    id_sensor: Mapped[int] = mapped_column(ForeignKey("sensores.id", ondelete="CASCADE"))
+    id_sensor: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("sensores.id", ondelete="CASCADE")
+    )
     valor: Mapped[float] = mapped_column(Numeric(10, 4))
     unidade: Mapped[str] = mapped_column(String(20))
