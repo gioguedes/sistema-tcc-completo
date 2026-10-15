@@ -18,7 +18,6 @@ if config.config_file_name is not None:
 target_metadata = Base.metadata
 
 TABELAS_FORA_DO_ESCOPO = {
-    "previsoes",
     "alertas",
     "eventos_mortalidade",
     "acionamentos_atuador",
