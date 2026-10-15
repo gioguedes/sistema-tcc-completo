@@ -15,3 +15,6 @@ build/
 # editor / SO
 .vscode/
 .DS_Store
+
+# modelos treinados (regeneraveis com python -m src.treino)
+ml/modelos/
