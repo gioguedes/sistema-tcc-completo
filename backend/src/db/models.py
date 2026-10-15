@@ -177,3 +177,25 @@ class Previsao(Base):
     ts_previsao: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )
+
+
+class AcionamentoAtuador(Base):
+    __tablename__ = "acionamentos_atuador"
+    __table_args__ = (CheckConstraint("acao IN ('ligar','desligar')", name="ck_acio_acao"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id_dispositivo: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("dispositivos.id", ondelete="CASCADE", name="fk_acio_disp")
+    )
+    id_tanque: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tanques.id", ondelete="CASCADE", name="fk_acio_tanque")
+    )
+    # preenchido quando o acionamento vem de uma previsao (automatico); nulo no comando manual
+    id_previsao: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("previsoes.id", ondelete="SET NULL", name="fk_acio_prev")
+    )
+    acao: Mapped[str] = mapped_column(String(10))
+    motivo: Mapped[str | None] = mapped_column(String(160))
+    ts_acionamento: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
