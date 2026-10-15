@@ -9,6 +9,7 @@ from sqlalchemy import (
     Identity,
     Index,
     Numeric,
+    SmallInteger,
     String,
     UniqueConstraint,
     text,
@@ -149,3 +150,30 @@ class Leitura(Base):
     )
     valor: Mapped[float] = mapped_column(Numeric(10, 4))
     unidade: Mapped[str] = mapped_column(String(20))
+
+
+class Previsao(Base):
+    __tablename__ = "previsoes"
+    __table_args__ = (
+        CheckConstraint("nivel_risco IN ('otimo','atencao','critico')", name="ck_prev_nivel"),
+        # h=0 e a estimativa de OD do instante atual (desvio declarado do DDL
+        # do TC1, que so previa 1, 2 e 3; ver spec do sub-projeto 3)
+        CheckConstraint("horizonte_h IN (0,1,2,3)", name="ck_prev_horiz"),
+        CheckConstraint(
+            "parametro_critico IN ('ph','temperatura','turbidez','od')", name="ck_prev_param"
+        ),
+        CheckConstraint("confianca IS NULL OR confianca BETWEEN 0 AND 1", name="ck_prev_conf"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id_tanque: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tanques.id", ondelete="CASCADE", name="fk_prev_tanque")
+    )
+    parametro_critico: Mapped[str] = mapped_column(String(30))
+    valor_previsto: Mapped[float] = mapped_column(Numeric(10, 4))
+    nivel_risco: Mapped[str] = mapped_column(String(20))
+    horizonte_h: Mapped[int] = mapped_column(SmallInteger)
+    confianca: Mapped[float | None] = mapped_column(Numeric(5, 4))
+    ts_previsao: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
