@@ -1,0 +1,148 @@
+CT02 - ponta a ponta: MQTT -> consumer -> leituras -> servico de ML -> previsoes
+Data: 15/10/2026 21:11:00 -0300  | banco isolado: piscicultura_ct02 | prefixo de topico: tcc-piscicultura-ct02-validacao
+Banco criado com o DDL do Apendice A + migracoes Alembic + seed. Modelo: ml/modelos/modelos.joblib (treino de 15/10/2026)
+
+== [terminal 1] consumer
+2026-10-15 21:11:01,687 INFO iniciando consumo do broker broker.hivemq.com:1883
+2026-10-15 21:11:02,425 INFO conectado ao broker broker.hivemq.com:1883, assinando tcc-piscicultura-ct02-validacao/+/leituras
+== [terminal 2] simulador: pH 7,0 -> 4,5 em 90 min, temperatura 26 C
+90 leituras publicadas em tcc-piscicultura-ct02-validacao/a4f00f643c70/leituras
+leituras gravadas no banco: 270 (90 mensagens x 3 grandezas)
+== [terminal 3] servico de ML, um ciclo (python -m src.servico --uma-vez)
+2026-10-15 21:11:34,020 INFO servico de ML iniciado, ciclo a cada 300 s
+2026-10-15 21:11:34,216 INFO tanque 1: OD 4.22 | risco 1h/2h/3h = critico/critico/critico
+2026-10-15 21:11:34,217 INFO ciclo: {'gravados': 1, 'indeterminados': 0, 'erros': 0}
+== previsoes gravadas
+ id_tanque | horizonte_h | parametro_critico | valor_previsto | nivel_risco | confianca |          ts_previsao          
+-----------+-------------+-------------------+----------------+-------------+-----------+-------------------------------
+         1 |           0 | od                |         4.2184 | atencao     |    0.8566 | 2026-10-16 00:11:34.020535+00
+         1 |           1 | ph                |         3.0110 | critico     |    0.9986 | 2026-10-16 00:11:34.020535+00
+         1 |           2 | ph                |         1.3675 | critico     |    0.9998 | 2026-10-16 00:11:34.020535+00
+         1 |           3 | ph                |         0.0000 | critico     |    0.9998 | 2026-10-16 00:11:34.020535+00
+(4 rows)
+
+
+== CA3: servico continuo (ML_INTERVALO_S=10 para acelerar), ~35 s
+2026-10-15 21:11:46,899 INFO servico de ML iniciado, ciclo a cada 10 s
+2026-10-15 21:11:47,061 INFO tanque 1: OD 4.22 | risco 1h/2h/3h = critico/critico/critico
+2026-10-15 21:11:47,061 INFO ciclo: {'gravados': 1, 'indeterminados': 0, 'erros': 0}
+2026-10-15 21:11:57,151 INFO tanque 1: OD 4.22 | risco 1h/2h/3h = critico/critico/critico
+2026-10-15 21:11:57,151 INFO ciclo: {'gravados': 1, 'indeterminados': 0, 'erros': 0}
+2026-10-15 21:12:07,246 INFO tanque 1: OD 4.22 | risco 1h/2h/3h = critico/critico/critico
+2026-10-15 21:12:07,246 INFO ciclo: {'gravados': 1, 'indeterminados': 0, 'erros': 0}
+2026-10-15 21:12:17,341 INFO tanque 1: OD 4.22 | risco 1h/2h/3h = critico/critico/critico
+2026-10-15 21:12:17,341 INFO ciclo: {'gravados': 1, 'indeterminados': 0, 'erros': 0}
+previsoes no banco: 20 (4 por ciclo)
+
+
+== API HTTP (FastAPI) lendo o que o servico de ML gravou: GET /api/v1/tanques/1/previsoes/atual
+{
+    "id_tanque": 1,
+    "nivel_risco": "critico",
+    "gerada_em": "2026-10-16T00:12:17.247354Z",
+    "od_atual": {
+        "valor": "4.2184",
+        "nivel_risco": "atencao",
+        "confianca": "0.8566",
+        "baixa_confianca": false
+    },
+    "horizontes": [
+        {
+            "id": 18,
+            "parametro_critico": "ph",
+            "valor_previsto": "3.0110",
+            "nivel_risco": "critico",
+            "horizonte_h": 1,
+            "confianca": "0.9986",
+            "baixa_confianca": false,
+            "ts_previsao": "2026-10-16T00:12:17.247354Z"
+        },
+        {
+            "id": 19,
+            "parametro_critico": "ph",
+            "valor_previsto": "1.3675",
+            "nivel_risco": "critico",
+            "horizonte_h": 2,
+            "confianca": "0.9998",
+            "baixa_confianca": false,
+            "ts_previsao": "2026-10-16T00:12:17.247354Z"
+        },
+        {
+            "id": 20,
+            "parametro_critico": "ph",
+            "valor_previsto": "0.0000",
+            "nivel_risco": "critico",
+            "horizonte_h": 3,
+            "confianca": "0.9998",
+            "baixa_confianca": false,
+            "ts_previsao": "2026-10-16T00:12:17.247354Z"
+        }
+    ]
+}
+== GET /api/v1/tanques
+[
+    {
+        "id": 1,
+        "nome": "Tanque bancada TCC",
+        "volume_litros": "500.00",
+        "quantidade_peixes": 0,
+        "data_povoamento": null,
+        "status": "ativo",
+        "criado_em": "2026-10-16T00:11:00.240321Z",
+        "especie": {
+            "id": 1,
+            "nome_comum": "Tilapia do Nilo",
+            "nome_cientifico": "Oreochromis niloticus",
+            "ph_min": "6.50",
+            "ph_max": "8.50",
+            "temp_min": "20.0",
+            "temp_max": "30.0",
+            "od_min": "4.00",
+            "od_max": "8.00"
+        },
+        "nivel_risco": "critico",
+        "ultima_leitura_em": "2026-10-16T00:11:04Z",
+        "ultimas_leituras": [
+            {
+                "grandeza": "ph",
+                "valor": "4.5000",
+                "unidade": "pH",
+                "ts": "2026-10-16T00:11:04Z",
+                "estimado": false,
+                "baixa_confianca": false
+            },
+            {
+                "grandeza": "temperatura",
+                "valor": "26.0000",
+                "unidade": "C",
+                "ts": "2026-10-16T00:11:04Z",
+                "estimado": false,
+                "baixa_confianca": false
+            },
+            {
+                "grandeza": "turbidez",
+                "valor": "10.0000",
+                "unidade": "NTU",
+                "ts": "2026-10-16T00:11:04Z",
+                "estimado": false,
+                "baixa_confianca": false
+            },
+            {
+                "grandeza": "od",
+                "valor": "4.2184",
+                "unidade": "mg/L",
+                "ts": "2026-10-16T00:12:17.247354Z",
+                "estimado": true,
+                "baixa_confianca": false
+            }
+        ],
+        "dispositivos": [
+            {
+                "id": 1,
+                "nome": "No sensor bancada",
+                "status_conexao": "online",
+                "ultima_leitura_em": "2026-10-16T00:11:04Z"
+            }
+        ]
+    }
+]
