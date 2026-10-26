@@ -1,0 +1,158 @@
+@import 'tailwindcss';
+
+/*
+ * Sistema visual do TC2 (§8): paleta, Public Sans e escala 12/14/16/20/28/40.
+ * A estrutura das telas segue o Figma "Painel Aquícola". Contraste de texto ≥ 4,5:1 e de bordas de campo ≥ 3:1.
+ * Desvio declarado: o âmbar de "atenção" do TC2 (#B87503) tem 3,76:1 sobre branco; o texto usa #8F5A00 (5,78:1).
+ */
+@theme {
+  --font-sans: 'Public Sans Variable', ui-sans-serif, system-ui, sans-serif;
+
+  /* escala do TC2 (Tailwind não tem 28 nem 40 por padrão; lg passa de 18 para 20) */
+  --text-lg: 1.25rem;
+  --text-lg--line-height: calc(1.75 / 1.25);
+  --text-2xl: 1.75rem;
+  --text-2xl--line-height: calc(2.25 / 1.75);
+  --text-3xl: 2.5rem;
+  --text-3xl--line-height: 1.1;
+
+  /* superficie (TC2) = fundo; superficie-alta (TC2) = superficie */
+  --color-fundo: #f5f7f6;
+  --color-superficie: #ffffff;
+  --color-borda: #e1e8e6;
+  --color-borda-forte: #c5d0ce;
+  --color-borda-campo: #7f918f;
+  --color-tinta: #132b2c;
+  --color-tinta-suave: #5a6e6d;
+
+  /* agua (TC2): texto e acentos; "solida" é o preenchimento sob texto branco */
+  --color-primaria: #2f6f73;
+  --color-primaria-escura: #245a5d;
+  --color-primaria-fundo: #e6f0f0;
+  --color-primaria-solida: #2f6f73;
+  --color-primaria-solida-hover: #245a5d;
+  --color-marinho: #173a3c;
+  --color-marinho-escuro: #0f2a2c;
+  --color-menu-ativo: #2f6f73;
+
+  --color-otimo: #1f7a55;
+  --color-otimo-fundo: #e8f3ee;
+  --color-otimo-borda: #b9dcc9;
+  --color-atencao: #8f5a00;
+  --color-atencao-fundo: #fbf3e4;
+  --color-atencao-borda: #ecd3a3;
+  --color-critico: #a83426;
+  --color-critico-solido: #a83426;
+  --color-critico-escuro: #8c2a1e;
+  --color-critico-fundo: #fbedeb;
+  --color-critico-borda: #efc4bd;
+  --color-neutro: #5f716f;
+  --color-neutro-fundo: #edf1f0;
+
+  /* séries dos gráficos (cores do Figma, ≥ 3:1 sobre a superfície) */
+  --color-serie-temperatura: #d97706;
+  --color-serie-ph: #0d9488;
+  --color-serie-turbidez: #2563eb;
+  --color-serie-od: #dc2626;
+
+  /* ilustração do cartão de tanque */
+  --color-ilustracao-agua: #d3e5e4;
+  --color-ilustracao-peixe: #557a7c;
+  --color-ilustracao-agua-critica: #f3d6d1;
+  --color-ilustracao-peixe-critico: #b4483b;
+  --color-ilustracao-onda: #ffffff;
+}
+
+@layer base {
+  /* Tema escuro opcional (TC2 §8): escolhido em Ajustes ou herdado do sistema ("Automático"). */
+  :root[data-tema='escuro'] {
+    color-scheme: dark;
+    --color-fundo: #0f191a;
+    --color-superficie: #172426;
+    --color-borda: #26383a;
+    --color-borda-forte: #33494b;
+    --color-borda-campo: #617779;
+    --color-tinta: #e3eceb;
+    --color-tinta-suave: #9db1af;
+
+    --color-primaria: #7cc4c8;
+    --color-primaria-escura: #a3d8db;
+    --color-primaria-fundo: #163536;
+    --color-primaria-solida: #2f6f73;
+    --color-primaria-solida-hover: #3a8287;
+    --color-marinho: #0b1f21;
+    --color-marinho-escuro: #071415;
+    --color-menu-ativo: #2f6f73;
+
+    --color-otimo: #5cc593;
+    --color-otimo-fundo: #15352a;
+    --color-otimo-borda: #24543f;
+    --color-atencao: #e6a93e;
+    --color-atencao-fundo: #3a2c10;
+    --color-atencao-borda: #5c4519;
+    --color-critico: #f08c7e;
+    --color-critico-solido: #b23b2d;
+    --color-critico-escuro: #932f23;
+    --color-critico-fundo: #3d1a16;
+    --color-critico-borda: #6a2d25;
+    --color-neutro: #93a7a5;
+    --color-neutro-fundo: #1f2f31;
+
+    --color-serie-temperatura: #f0a442;
+    --color-serie-ph: #3cc6b6;
+    --color-serie-turbidez: #7ba6f7;
+    --color-serie-od: #f27b70;
+
+    --color-ilustracao-agua: #1d3a3c;
+    --color-ilustracao-peixe: #8fb5b6;
+    --color-ilustracao-agua-critica: #3d1f1b;
+    --color-ilustracao-peixe-critico: #f08c7e;
+    --color-ilustracao-onda: #2e5355;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-fundo font-sans text-tinta antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-primaria);
+    outline-offset: 2px;
+  }
+
+  dialog::backdrop {
+    background: rgb(15 23 42 / 0.45);
+  }
+
+  /* Troca de tema: o círculo é animado em JS (app/tema.ts); aqui só desliga o cross-fade padrão. */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Antes do JS: quem usa tema escuro no sistema não vê o fundo claro piscar. */
+@media (prefers-color-scheme: dark) {
+  html:not([data-tema]) body {
+    background: #0f191a;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+}
