@@ -6,9 +6,10 @@ services:
     environment:
       POSTGRES_DB: ${DB_NAME:-piscicultura}
       POSTGRES_USER: ${DB_USER:-piscicultura}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-piscicultura}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?defina DB_PASSWORD no .env}
     ports:
-      - "${DB_PORT:-5432}:5432"
+      # só a máquina local acessa o banco (a API, a ingestão e o ML rodam nela)
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       - timescaledb_data:/var/lib/postgresql
       - ./db/init:/docker-entrypoint-initdb.d
@@ -23,7 +24,7 @@ services:
     container_name: piscicultura-mosquitto-test
     restart: "no"
     ports:
-      - "1884:1883"
+      - "127.0.0.1:1884:1883"
     volumes:
       - ./docker/mosquitto-test.conf:/mosquitto/config/mosquitto.conf:ro
 
