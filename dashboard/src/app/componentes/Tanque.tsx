@@ -2,10 +2,11 @@ import type React from 'react'
 import { Link } from 'react-router'
 import { ChevronRight, Clock, Droplets, FlaskConical, Hourglass, Thermometer, Unplug, Wind, WifiOff, type LucideIcon } from 'lucide-react'
 import { cn } from '@/compartilhado/cn'
-import { tempoRelativo } from '@/compartilhado/formatacao'
+import { formatarNumero, tempoRelativo } from '@/compartilhado/formatacao'
 import type { Grandeza, NivelRisco } from '@/dominio/comum'
 import type { Especie, LeituraAtual, Tanque } from '@/dominio/entidades'
 import { faixaIdealDe, formatarFaixa, formatarValor, GRANDEZAS, ORDEM_GRANDEZAS } from '@/dominio/grandezas'
+import { alertaTermico, percentualSaturacao } from '@/dominio/oxigenio'
 import { ROTULO_STATUS_TANQUE } from '@/dominio/rotulos'
 import { leituraAtrasada, situacaoDados, type SituacaoDados } from '@/dominio/situacao'
 import { IlustracaoTanque, InfoPopover, LinhaMetrica } from '@/ui/Pecas'
@@ -42,8 +43,9 @@ function Aviso({ children }: { children: string }) {
 
 /** Valores mais recentes do tanque, na ordem do Figma. */
 export function ParametrosAtuais({ leituras, especie, ultimaLeitura, agora }: PropsParametros) {
-  const { modoAvancado } = usePreferencias()
+  const { modoAvancado, altitudeM } = usePreferencias()
   const rotulo = useRotuloGrandeza()
+  const temperatura = leituras.find((l) => l.grandeza === 'temperatura')
   return (
     <div>
       {ORDEM_GRANDEZAS.map((g) => {
@@ -56,6 +58,13 @@ export function ParametrosAtuais({ leituras, especie, ultimaLeitura, agora }: Pr
           avisos.push(<Aviso key="atraso">{leitura.estimado ? `Estimativa de ${quando}` : `Sensor sem leitura ${quando}`}</Aviso>)
         }
         if (leitura?.baixa_confianca) avisos.push(<Aviso key="confianca">Estimativa de confiança baixa</Aviso>)
+        if (g === 'od' && leitura && temperatura) {
+          if (alertaTermico(leitura.valor, temperatura.valor)) {
+            avisos.push(<Aviso key="termico">Oxigênio baixo para água quente</Aviso>)
+          }
+          const saturacao = percentualSaturacao(leitura.valor, temperatura.valor, altitudeM)
+          avisos.push(<span key="saturacao">{formatarNumero(saturacao, 0)}% de saturação</span>)
+        }
         if (modoAvancado && faixa) avisos.push(<span key="faixa">Faixa ideal: {formatarFaixa(g, faixa)}</span>)
         return (
           <LinhaMetrica

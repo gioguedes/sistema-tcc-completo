@@ -29,6 +29,11 @@ const GLOSSARIO = [
     termo: 'OD (Oxigênio dissolvido)',
     definicao: 'É a quantidade de oxigênio na água, essencial para a vida dos peixes. Abaixo de 3 mg/L, o risco é alto.',
   },
+  {
+    termo: '% de saturação',
+    definicao:
+      'Quanto oxigênio a água tem em relação ao máximo que ela consegue segurar naquela temperatura e altitude. Água quente segura menos oxigênio.',
+  },
 ]
 
 const OPCOES_TEMA: { valor: Tema; rotulo: string }[] = [
@@ -114,7 +119,7 @@ function FormularioConta() {
 export default function PaginaConfiguracoes() {
   useTituloDocumento('Configurações')
   const { sair } = useAutenticacao()
-  const { modoAvancado, linguagemSimples, explicacaoOdDispensada, tema, alterar } = usePreferencias()
+  const { modoAvancado, linguagemSimples, explicacaoOdDispensada, tema, altitudeM, alterar } = usePreferencias()
   const [busca, setBusca] = useState('')
   const trocarTema = (novo: Tema, evento: MouseEvent<HTMLButtonElement>) => {
     if (novo === tema) return
@@ -162,6 +167,21 @@ export default function PaginaConfiguracoes() {
           descricao="Troca termos técnicos por explicações do dia a dia."
           ligado={linguagemSimples}
           aoAlternar={(v) => alterar({ linguagemSimples: v })}
+        />
+        <Campo
+          rotulo="Altitude do local"
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={5000}
+          step={10}
+          sufixo="m"
+          defaultValue={altitudeM}
+          dica="Corrige o % de saturação do oxigênio pela pressão do ar. São Paulo fica a cerca de 760 m."
+          onChange={(e) => {
+            const valor = e.target.valueAsNumber
+            if (Number.isFinite(valor) && valor >= 0 && valor <= 5000) alterar({ altitudeM: valor })
+          }}
         />
         <p className="text-xs text-tinta-suave">As preferências ficam salvas neste aparelho.</p>
       </Cartao>

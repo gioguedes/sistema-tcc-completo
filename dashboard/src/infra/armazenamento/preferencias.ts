@@ -11,6 +11,8 @@ export interface Preferencias {
   tema: Tema
   /** Menu lateral do computador reduzido aos ícones. */
   menuRecolhido: boolean
+  /** Altitude do local em metros: corrige o OD de saturação pela pressão do ar. */
+  altitudeM: number
 }
 
 const CHAVE = 'painel-aquicola:preferencias'
@@ -21,6 +23,8 @@ export const PREFERENCIAS_PADRAO: Preferencias = {
   explicacaoOdDispensada: false,
   tema: 'automatico',
   menuRecolhido: false,
+  // altitude de São Paulo, onde está o protótipo
+  altitudeM: 760,
 }
 
 // Preferência de interface por aparelho: o armazenamento pode falhar (aba anônima) sem quebrar a tela.
