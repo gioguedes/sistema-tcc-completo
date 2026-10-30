@@ -29,3 +29,19 @@ def test_payload_com_grandeza_nula_e_descartada_do_wide_narrow():
 def test_payload_sem_mac_falha_validacao():
     with pytest.raises(ValidationError):
         LeituraMqttPayload(ts=1758499200, ph=6.8, temperatura=27.9, turbidez=11.7)
+
+@pytest.mark.parametrize(
+    "sobrescrita",
+    [
+        {"ph": float("nan")},
+        {"temperatura": float("inf")},
+        {"turbidez": 3000.5},
+        {"temperatura": -50.1},
+        {"ts": 1000000000000},
+        {"ts": -1},
+    ],
+)
+def test_payload_fora_do_dominio_falha_validacao(sobrescrita):
+    campos = {"mac": "a4f00f643c70", "ts": 1758499200, "ph": 6.8} | sobrescrita
+    with pytest.raises(ValidationError):
+        LeituraMqttPayload(**campos)

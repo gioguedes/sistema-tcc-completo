@@ -51,3 +51,15 @@ def test_mensagem_invalida_e_descartada_sem_lancar(caplog):
 
     processor.processar_payload.assert_not_called()
     assert "payload invalido" in caplog.text
+
+def test_falha_ao_gravar_e_registrada_sem_derrubar_o_laco(caplog):
+    processor = MagicMock()
+    processor.processar_payload.side_effect = RuntimeError("banco fora do ar")
+    consumer = _consumer(processor)
+    payload_json = b'{"mac": "a4f00f643c70", "ts": 1758499200, "ph": 6.8}'
+    mensagem = _MensagemFake("tcc-piscicultura-morgado/a4f00f643c70/leituras", payload_json)
+
+    with caplog.at_level(logging.ERROR):
+        consumer._ao_receber_mensagem(None, None, mensagem)
+
+    assert "falha ao gravar" in caplog.text

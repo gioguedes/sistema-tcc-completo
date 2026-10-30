@@ -1,14 +1,18 @@
 from datetime import datetime, timezone
+from typing import Annotated
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# Mesma faixa do CHECK ck_leit_valor da tabela leituras.
+ValorLeitura = Annotated[float, Field(ge=-50, le=3000, allow_inf_nan=False)]
 
 
 class LeituraMqttPayload(BaseModel):
     mac: str
-    ts: int
-    ph: float | None = None
-    temperatura: float | None = None
-    turbidez: float | None = None
+    ts: int = Field(ge=0, le=4102444800)
+    ph: ValorLeitura | None = None
+    temperatura: ValorLeitura | None = None
+    turbidez: ValorLeitura | None = None
 
     @property
     def ts_utc(self) -> datetime:

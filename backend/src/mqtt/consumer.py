@@ -41,8 +41,11 @@ class ConsumerMqtt:
             logger.exception("payload invalido no topico %s, descartando", msg.topic)
             return
 
-        with self._session_factory() as session:
-            self._processor.processar_payload(session, payload)
+        try:
+            with self._session_factory() as session:
+                self._processor.processar_payload(session, payload)
+        except Exception:
+            logger.exception("falha ao gravar leitura do topico %s, descartando", msg.topic)
 
     def rodar_para_sempre(self) -> None:
         self._client.connect(self._broker_host, self._broker_port)
