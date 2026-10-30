@@ -81,7 +81,9 @@ def main(argv: list[str] | None = None) -> None:
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     settings = Settings()
-    inferencia = Inferencia(carregar_pacote(settings.caminho_modelos), settings.ml_cobertura_min_blocos)
+    inferencia = Inferencia(
+        carregar_pacote(settings.caminho_modelos), settings.ml_cobertura_min_blocos, settings.ml_altitude_m
+    )
     engine = create_engine(settings.database_url)
     aerador = _controle_aerador(settings)
     logger.info("servico de ML iniciado, ciclo a cada %d s", settings.ml_intervalo_s)

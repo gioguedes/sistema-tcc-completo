@@ -16,7 +16,7 @@ def _risco(acuracia: float, recall_xgb: float, recall_persistencia: float) -> di
 
     return {
         "xgboost": m(acuracia, recall_xgb),
-        "random_forest": m(0.5, 0.5),
+        "classificador": m(0.5, 0.5),
         "persistencia": m(0.5, recall_persistencia),
         "distribuicao_teste": [1, 1, 1],
     }

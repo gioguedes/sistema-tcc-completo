@@ -4,7 +4,12 @@ from pathlib import Path
 META_MAE_OD = 0.8
 META_ACURACIA_RISCO = 0.80
 MODELOS_OD = ("xgboost", "random_forest", "mediana")
-MODELOS_RISCO = ("xgboost", "random_forest", "persistencia")
+MODELOS_RISCO = ("xgboost", "classificador", "persistencia")
+NOMES_RISCO = {
+    "xgboost": "xgboost (previsão de pH e T + regra)",
+    "classificador": "classificador direto (linha de base)",
+    "persistencia": "persistência",
+}
 
 
 def veredito_h1(metricas_od: dict) -> bool:
@@ -54,21 +59,21 @@ def _tabela_risco(por_modelo: dict) -> list[str]:
     for nome in MODELOS_RISCO:
         m = por_modelo[nome]
         linhas.append(
-            f"| {nome} | {m['acuracia']:.1%} | {m['f1_macro']:.3f} | {m['recall_critico']:.1%} | {m['matriz_confusao']} |"
+            f"| {NOMES_RISCO[nome]} | {m['acuracia']:.1%} | {m['f1_macro']:.3f} | {m['recall_critico']:.1%} | {m['matriz_confusao']} |"
         )
     return linhas
 
 
 def _tabela_risco_por_grupo(validacao: dict, h: int) -> list[str]:
     linhas = [
-        "| Corpo d'água fora | Acurácia XGBoost | Recall crítico XGBoost | Acurácia RF | Acurácia persistência | Recall crítico persistência |",
+        "| Corpo d'água fora | Acurácia XGBoost | Recall crítico XGBoost | Acurácia classificador | Acurácia persistência | Recall crítico persistência |",
         "|---|---|---|---|---|---|",
     ]
     for grupo, por_h in [*validacao["por_grupo"].items(), ("**média**", validacao["media"])]:
         m = por_h[h]
         linhas.append(
             f"| {grupo} | {m['xgboost']['acuracia']:.1%} | {m['xgboost']['recall_critico']:.1%} | "
-            f"{m['random_forest']['acuracia']:.1%} | {m['persistencia']['acuracia']:.1%} | "
+            f"{m['classificador']['acuracia']:.1%} | {m['persistencia']['acuracia']:.1%} | "
             f"{m['persistencia']['recall_critico']:.1%} |"
         )
     return linhas
@@ -98,7 +103,7 @@ def gerar_relatorio(dados: dict, pasta: Path) -> Path:
     od, niveis = dados["od"], dados["distribuicao_niveis"]
     total_niveis = sum(niveis)
     linhas = [
-        "# Relatório de treino: estimador de OD e classificador de risco",
+        "# Relatório de treino: estimador de OD e previsão de risco",
         "",
         f"Gerado em: {dados['criado_em']}",
         "",
@@ -138,8 +143,18 @@ def gerar_relatorio(dados: dict, pasta: Path) -> Path:
         "",
         *_tabela_od(od["temporal"]),
         "",
-        "## Classificador de risco (H2: acurácia ≥ 80% pelo TC1; a spec exige também recall de crítico acima da persistência)",
+        "## Previsão de risco (H2: acurácia ≥ 80% pelo TC1; a spec exige também recall de crítico acima da persistência)",
+        "",
+        "O XGBoost prevê a variação de pH e de temperatura até t+h; o OD em t+h sai do estimador de OD "
+        "aplicado a esses valores, e o nível sai da mesma regra de faixas do rótulo. O classificador "
+        "direto do nível (modelo de risco até 29/10/2026) fica como linha de base.",
         *_secao_risco(dados["risco"]),
+        "",
+        "## Domínio do estimador de OD (percentis 1 e 99 do treino)",
+        "",
+        *[f"- {g}: {lo:.2f} a {hi:.2f}" for g, (lo, hi) in dados.get("dominio_od", {}).items()],
+        "",
+        "Fora desse domínio o serviço grava o OD com confiança 0 (o modelo nunca viu esses valores).",
         "",
         "## Datasets (SHA-256)",
         "",

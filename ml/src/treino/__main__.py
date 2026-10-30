@@ -10,7 +10,7 @@ from src.dados.carregar import carregar_todos
 from src.dados.limpar import limpar
 from src.faixas import TILAPIA, nivel_geral
 from src.pacote import montar_pacote, salvar_pacote
-from src.treino.modelo_od import FEATURES_OD, comparar_od, od_fora_da_dobra, treinar_od
+from src.treino.modelo_od import FEATURES_OD, comparar_od, od_fora_da_dobra, treinar_od, treinar_od_central
 from src.treino.modelo_risco import avaliar_risco, montar_dataset_risco, treinar_risco
 from src.treino.preparar import grupos_dos_pontos, linhas_validas_od, series_por_ponto
 from src.treino.relatorio import gerar_relatorio
@@ -60,14 +60,27 @@ def treinar(
     dataset = montar_dataset_risco(series, grupo_de, TILAPIA, cobertura_min_blocos)
     treino_risco, teste_risco = dataset[dataset["grupo"].isin(grupos_treino)], dataset[dataset["grupo"].isin(grupos_teste)]
     modelos_risco = treinar_risco(treino_risco, n_estimadores)
+
+    # a regra aplica o estimador de OD aos valores previstos: em cada avaliação ele não pode ter
+    # visto os corpos d'água (ou o período) avaliados
+    def od_sem(fora: pd.DataFrame):
+        return treinar_od_central(treino_od[~treino_od["grupo"].isin(set(fora["grupo"]))], n_estimadores)
+
+    risco_treino_temporal, risco_teste_temporal = split_temporal(treino_risco)
     risco = {
-        "teste": avaliar_risco(treino_risco, teste_risco, n_estimadores),
-        "validacao_cruzada": validacao_cruzada(treino_risco, lambda a, b: avaliar_risco(a, b, n_estimadores)),
-        "temporal": avaliar_risco(*split_temporal(treino_risco), n_estimadores),
+        "teste": avaliar_risco(treino_risco, teste_risco, modelos_od["od"], TILAPIA, n_estimadores),
+        "validacao_cruzada": validacao_cruzada(
+            treino_risco, lambda a, b: avaliar_risco(a, b, od_sem(b), TILAPIA, n_estimadores)
+        ),
+        "temporal": avaliar_risco(
+            risco_treino_temporal, risco_teste_temporal,
+            treinar_od_central(split_temporal(treino_od)[0], n_estimadores), TILAPIA, n_estimadores,
+        ),
     }
     logger.info("risco: acurácia teste 1h %.3f", risco["teste"][1]["xgboost"]["acuracia"])
 
-    salvar_pacote(montar_pacote(modelos_od, modelos_risco, TILAPIA, hashes), caminho_modelos)
+    dominio_od = {g: [float(v) for v in np.percentile(treino_od[g], [1, 99])] for g in FEATURES_OD}
+    salvar_pacote(montar_pacote(modelos_od, modelos_risco, TILAPIA, hashes, dominio_od), caminho_modelos)
     niveis = nivel_geral(validas["ph"], validas["temperatura"], validas["od"], TILAPIA).astype(int)
     return gerar_relatorio(
         {
@@ -83,6 +96,7 @@ def treinar(
             "limpeza": removidas,
             "od": od,
             "risco": risco,
+            "dominio_od": dominio_od,
             "hashes_datasets": hashes,
         },
         pasta_relatorios,

@@ -1,6 +1,6 @@
-# Relatório de treino: estimador de OD e classificador de risco
+# Relatório de treino: estimador de OD e previsão de risco
 
-Gerado em: 2026-10-16T00:01:47.214479+00:00
+Gerado em: 2026-10-30T01:13:25.596005+00:00
 
 ## Dados (USGS, só leituras aprovadas, blocos de 15 min)
 
@@ -30,7 +30,7 @@ Teste final:
 
 | Modelo | MAE (mg/L) | RMSE | R² | Acurácia de faixa |
 |---|---|---|---|---|
-| xgboost | 0.595 | 0.757 | 0.767 | 95.6% |
+| xgboost | 0.515 | 0.645 | 0.831 | 95.6% |
 | random_forest | 0.621 | 0.784 | 0.751 | 94.9% |
 | mediana | 1.345 | 1.588 | -0.023 | 95.6% |
 
@@ -40,21 +40,23 @@ Validação cruzada por corpo d'água (treino):
 
 | Corpo d'água fora | MAE XGBoost | MAE Random Forest | MAE mediana |
 |---|---|---|---|
-| lake_houston | 1.442 | 1.419 | 1.911 |
-| luce_bayou | 0.954 | 0.962 | 1.623 |
-| st_lucie | 1.517 | 1.537 | 1.896 |
-| winona | 0.604 | 0.677 | 1.754 |
-| **média** | 1.129 | 1.149 | 1.796 |
+| lake_houston | 1.246 | 1.419 | 1.911 |
+| luce_bayou | 0.819 | 0.962 | 1.623 |
+| st_lucie | 1.470 | 1.537 | 1.896 |
+| winona | 0.780 | 0.677 | 1.754 |
+| **média** | 1.079 | 1.149 | 1.796 |
 
 Split temporal (2023 → 2024, corpos de treino):
 
 | Modelo | MAE (mg/L) | RMSE | R² | Acurácia de faixa |
 |---|---|---|---|---|
-| xgboost | 1.104 | 1.515 | 0.498 | 88.0% |
+| xgboost | 1.037 | 1.424 | 0.556 | 89.1% |
 | random_forest | 1.121 | 1.509 | 0.501 | 88.5% |
 | mediana | 1.617 | 2.146 | -0.009 | 90.2% |
 
-## Classificador de risco (H2: acurácia ≥ 80% pelo TC1; a spec exige também recall de crítico acima da persistência)
+## Previsão de risco (H2: acurácia ≥ 80% pelo TC1; a spec exige também recall de crítico acima da persistência)
+
+O XGBoost prevê a variação de pH e de temperatura até t+h; o OD em t+h sai do estimador de OD aplicado a esses valores, e o nível sai da mesma regra de faixas do rótulo. O classificador direto do nível (modelo de risco até 29/10/2026) fica como linha de base.
 
 ### Horizonte 1 h
 
@@ -64,21 +66,21 @@ Distribuição ótimo/atenção/crítico: [21520, 7534, 31103]
 
 | Modelo | Acurácia | F1 macro | Recall crítico | Matriz de confusão |
 |---|---|---|---|---|
-| xgboost | 96.3% | 0.941 | 96.7% | [[20945, 512, 63], [196, 6876, 462], [135, 886, 30082]] |
-| random_forest | 96.6% | 0.946 | 96.5% | [[21260, 259, 1], [292, 6817, 425], [176, 916, 30011]] |
-| persistencia | 97.8% | 0.964 | 98.2% | [[21299, 220, 1], [325, 6956, 253], [181, 364, 30558]] |
+| xgboost (previsão de pH e T + regra) | 97.3% | 0.956 | 98.6% | [[21040, 479, 1], [223, 6833, 478], [177, 271, 30655]] |
+| classificador direto (linha de base) | 96.9% | 0.952 | 96.6% | [[21138, 381, 1], [263, 7108, 163], [183, 868, 30052]] |
+| persistência | 97.8% | 0.964 | 98.2% | [[21299, 220, 1], [325, 6956, 253], [181, 364, 30558]] |
 
-H2 neste horizonte, critério do TC1 (acurácia ≥ 80%): **ATINGIDA** | critério da spec (também ganhar da persistência no recall de crítico): **NÃO atingida**
+H2 neste horizonte, critério do TC1 (acurácia ≥ 80%): **ATINGIDA** | critério da spec (também ganhar da persistência no recall de crítico): **ATINGIDA**
 
 Validação cruzada por corpo d'água (treino):
 
-| Corpo d'água fora | Acurácia XGBoost | Recall crítico XGBoost | Acurácia RF | Acurácia persistência | Recall crítico persistência |
+| Corpo d'água fora | Acurácia XGBoost | Recall crítico XGBoost | Acurácia classificador | Acurácia persistência | Recall crítico persistência |
 |---|---|---|---|---|---|
-| lake_houston | 86.3% | 96.4% | 85.8% | 85.5% | 96.9% |
-| luce_bayou | 96.3% | 96.3% | 96.2% | 97.4% | 98.8% |
-| st_lucie | 87.2% | 76.0% | 87.2% | 88.5% | 79.9% |
-| winona | 66.9% | 67.7% | 45.4% | 99.2% | 99.9% |
-| **média** | 84.2% | 84.1% | 78.7% | 92.7% | 93.9% |
+| lake_houston | 87.2% | 97.9% | 86.4% | 88.1% | 97.5% |
+| luce_bayou | 96.8% | 99.6% | 96.2% | 97.4% | 98.8% |
+| st_lucie | 88.3% | 81.3% | 87.1% | 88.5% | 79.9% |
+| winona | 98.7% | 99.5% | 55.3% | 99.2% | 99.9% |
+| **média** | 92.8% | 94.6% | 81.2% | 93.3% | 94.0% |
 
 Split temporal (2023 → 2024, corpos de treino):
 
@@ -86,9 +88,9 @@ Distribuição ótimo/atenção/crítico: [49455, 19641, 94172]
 
 | Modelo | Acurácia | F1 macro | Recall crítico | Matriz de confusão |
 |---|---|---|---|---|
-| xgboost | 90.2% | 0.856 | 92.3% | [[45704, 1808, 1943], [2897, 14549, 2195], [3232, 3985, 86955]] |
-| random_forest | 90.8% | 0.857 | 92.0% | [[48075, 1298, 82], [3354, 13606, 2681], [3523, 4034, 86615]] |
-| persistencia | 86.2% | 0.818 | 93.4% | [[38685, 2205, 8565], [1645, 14109, 3887], [2535, 3689, 87948]] |
+| xgboost (previsão de pH e T + regra) | 91.3% | 0.864 | 95.9% | [[45453, 2552, 1450], [1599, 13371, 4671], [2716, 1138, 90318]] |
+| classificador direto (linha de base) | 89.9% | 0.845 | 93.0% | [[45845, 1804, 1806], [2116, 13275, 4250], [2386, 4178, 87608]] |
+| persistência | 88.1% | 0.827 | 94.0% | [[41210, 4323, 3922], [1564, 14053, 4024], [2526, 3139, 88507]] |
 
 ### Horizonte 2 h
 
@@ -98,21 +100,21 @@ Distribuição ótimo/atenção/crítico: [21513, 7534, 31034]
 
 | Modelo | Acurácia | F1 macro | Recall crítico | Matriz de confusão |
 |---|---|---|---|---|
-| xgboost | 95.1% | 0.925 | 95.1% | [[20551, 830, 132], [221, 7036, 277], [115, 1398, 29521]] |
-| random_forest | 94.8% | 0.921 | 94.5% | [[20782, 731, 0], [255, 6864, 415], [154, 1541, 29339]] |
-| persistencia | 96.8% | 0.947 | 97.7% | [[21154, 359, 0], [473, 6649, 412], [172, 527, 30335]] |
+| xgboost (previsão de pH e T + regra) | 96.6% | 0.944 | 98.2% | [[20940, 573, 0], [330, 6605, 599], [164, 397, 30473]] |
+| classificador direto (linha de base) | 95.7% | 0.934 | 95.1% | [[20938, 575, 0], [370, 7058, 106], [195, 1326, 29513]] |
+| persistência | 96.8% | 0.947 | 97.7% | [[21154, 359, 0], [473, 6649, 412], [172, 527, 30335]] |
 
-H2 neste horizonte, critério do TC1 (acurácia ≥ 80%): **ATINGIDA** | critério da spec (também ganhar da persistência no recall de crítico): **NÃO atingida**
+H2 neste horizonte, critério do TC1 (acurácia ≥ 80%): **ATINGIDA** | critério da spec (também ganhar da persistência no recall de crítico): **ATINGIDA**
 
 Validação cruzada por corpo d'água (treino):
 
-| Corpo d'água fora | Acurácia XGBoost | Recall crítico XGBoost | Acurácia RF | Acurácia persistência | Recall crítico persistência |
+| Corpo d'água fora | Acurácia XGBoost | Recall crítico XGBoost | Acurácia classificador | Acurácia persistência | Recall crítico persistência |
 |---|---|---|---|---|---|
-| lake_houston | 83.6% | 94.9% | 82.0% | 83.6% | 95.9% |
-| luce_bayou | 94.4% | 95.0% | 94.2% | 95.2% | 97.9% |
-| st_lucie | 85.0% | 72.3% | 84.9% | 86.7% | 78.7% |
-| winona | 47.7% | 47.2% | 41.3% | 98.7% | 99.7% |
-| **média** | 77.7% | 77.4% | 75.6% | 91.1% | 93.1% |
+| lake_houston | 84.8% | 96.9% | 84.0% | 86.2% | 96.5% |
+| luce_bayou | 95.6% | 99.0% | 94.2% | 95.2% | 97.9% |
+| st_lucie | 87.0% | 80.7% | 85.1% | 86.7% | 78.7% |
+| winona | 98.1% | 99.1% | 48.6% | 98.7% | 99.8% |
+| **média** | 91.4% | 93.9% | 78.0% | 91.7% | 93.2% |
 
 Split temporal (2023 → 2024, corpos de treino):
 
@@ -120,9 +122,9 @@ Distribuição ótimo/atenção/crítico: [49438, 19625, 93936]
 
 | Modelo | Acurácia | F1 macro | Recall crítico | Matriz de confusão |
 |---|---|---|---|---|
-| xgboost | 88.2% | 0.817 | 91.2% | [[45651, 2289, 1498], [3371, 12393, 3861], [2868, 5394, 85674]] |
-| random_forest | 88.3% | 0.811 | 90.3% | [[47465, 1838, 135], [5583, 11614, 2428], [3688, 5413, 84835]] |
-| persistencia | 84.5% | 0.790 | 92.5% | [[38090, 2730, 8618], [2087, 12849, 4689], [2663, 4402, 86871]] |
+| xgboost (previsão de pH e T + regra) | 90.5% | 0.846 | 94.9% | [[45688, 2706, 1044], [2323, 12577, 4725], [2858, 1903, 89175]] |
+| classificador direto (linha de base) | 87.9% | 0.819 | 91.7% | [[44374, 2104, 2960], [2958, 12793, 3874], [2613, 5212, 86111]] |
+| persistência | 86.4% | 0.800 | 93.1% | [[40623, 4828, 3987], [1996, 12806, 4823], [2654, 3857, 87425]] |
 
 ### Horizonte 3 h
 
@@ -132,21 +134,21 @@ Distribuição ótimo/atenção/crítico: [21509, 7532, 30970]
 
 | Modelo | Acurácia | F1 macro | Recall crítico | Matriz de confusão |
 |---|---|---|---|---|
-| xgboost | 93.8% | 0.909 | 92.8% | [[20375, 1036, 98], [277, 7174, 81], [117, 2104, 28749]] |
-| random_forest | 93.2% | 0.898 | 92.2% | [[20592, 916, 1], [333, 6762, 437], [128, 2282, 28560]] |
-| persistencia | 95.8% | 0.929 | 97.3% | [[21005, 501, 3], [634, 6336, 562], [156, 694, 30120]] |
+| xgboost (previsão de pH e T + regra) | 95.7% | 0.929 | 97.6% | [[20784, 724, 1], [405, 6411, 716], [148, 604, 30218]] |
+| classificador direto (linha de base) | 94.3% | 0.914 | 93.1% | [[20716, 792, 1], [398, 7036, 98], [164, 1973, 28833]] |
+| persistência | 95.8% | 0.929 | 97.3% | [[21005, 501, 3], [634, 6336, 562], [156, 694, 30120]] |
 
-H2 neste horizonte, critério do TC1 (acurácia ≥ 80%): **ATINGIDA** | critério da spec (também ganhar da persistência no recall de crítico): **NÃO atingida**
+H2 neste horizonte, critério do TC1 (acurácia ≥ 80%): **ATINGIDA** | critério da spec (também ganhar da persistência no recall de crítico): **ATINGIDA**
 
 Validação cruzada por corpo d'água (treino):
 
-| Corpo d'água fora | Acurácia XGBoost | Recall crítico XGBoost | Acurácia RF | Acurácia persistência | Recall crítico persistência |
+| Corpo d'água fora | Acurácia XGBoost | Recall crítico XGBoost | Acurácia classificador | Acurácia persistência | Recall crítico persistência |
 |---|---|---|---|---|---|
-| lake_houston | 79.7% | 93.5% | 78.0% | 82.1% | 95.2% |
-| luce_bayou | 92.4% | 93.2% | 92.2% | 93.2% | 97.0% |
-| st_lucie | 82.9% | 69.3% | 82.5% | 85.0% | 77.5% |
-| winona | 44.7% | 44.7% | 34.8% | 98.3% | 99.6% |
-| **média** | 74.9% | 75.2% | 71.9% | 89.7% | 92.3% |
+| lake_houston | 83.7% | 95.7% | 79.0% | 84.7% | 95.7% |
+| luce_bayou | 94.1% | 98.2% | 92.4% | 93.2% | 97.0% |
+| st_lucie | 86.0% | 80.3% | 82.6% | 85.0% | 77.5% |
+| winona | 98.0% | 99.5% | 45.5% | 98.3% | 99.7% |
+| **média** | 90.5% | 93.4% | 74.9% | 90.3% | 92.5% |
 
 Split temporal (2023 → 2024, corpos de treino):
 
@@ -154,9 +156,16 @@ Distribuição ótimo/atenção/crítico: [49420, 19625, 93738]
 
 | Modelo | Acurácia | F1 macro | Recall crítico | Matriz de confusão |
 |---|---|---|---|---|
-| xgboost | 86.1% | 0.784 | 89.4% | [[44835, 3641, 944], [4288, 11491, 3846], [2780, 7191, 83767]] |
-| random_forest | 86.4% | 0.788 | 88.4% | [[46672, 2347, 401], [4895, 11146, 3584], [3905, 6963, 82870]] |
-| persistencia | 83.2% | 0.768 | 91.8% | [[37552, 3179, 8689], [2435, 11890, 5300], [2827, 4900, 86011]] |
+| xgboost (previsão de pH e T + regra) | 89.0% | 0.821 | 94.3% | [[45052, 3084, 1284], [2714, 11484, 5427], [3000, 2361, 88377]] |
+| classificador direto (linha de base) | 86.5% | 0.792 | 89.4% | [[45213, 3352, 855], [3589, 11815, 4221], [2873, 7065, 83800]] |
+| persistência | 85.1% | 0.779 | 92.3% | [[40103, 5251, 4066], [2332, 11850, 5443], [2814, 4376, 86548]] |
+
+## Domínio do estimador de OD (percentis 1 e 99 do treino)
+
+- temperatura: 15.20 a 33.50
+- ph: 5.90 a 9.40
+
+Fora desse domínio o serviço grava o OD com confiança 0 (o modelo nunca viu esses valores).
 
 ## Datasets (SHA-256)
 

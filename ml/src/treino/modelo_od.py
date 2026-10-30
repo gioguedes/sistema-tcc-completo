@@ -6,9 +6,29 @@ from sklearn.model_selection import LeaveOneGroupOut
 from xgboost import XGBRegressor
 
 from src.faixas import FaixaEspecie, niveis
+from src.oxigenio import od_saturacao
 
 FEATURES_OD = ["temperatura", "ph"]
 QUANTIS = {"od_q10": 0.10, "od_q90": 0.90}
+# OD cai com a temperatura e sobe com o pH (fotossíntese consome CO2): restrição monotônica
+MONOTONIA = "(-1,1)"
+
+
+class EstimadorOD:
+    """XGBoost que estima a fração de saturação OD/OD_sat(T) e devolve OD em mg/L.
+
+    Separa a física (solubilidade, que depende da temperatura e da pressão) da
+    biologia, e corrige a altitude: os lagos do USGS estão perto do nível do mar,
+    e o tanque pode não estar. `altitude_m` é ajustada pelo serviço.
+    """
+
+    def __init__(self, modelo: XGBRegressor, altitude_m: float = 0.0) -> None:
+        self.modelo = modelo
+        self.altitude_m = altitude_m
+
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
+        fracao = self.modelo.predict(X[FEATURES_OD])
+        return fracao * od_saturacao(X["temperatura"], self.altitude_m)
 
 
 def _xgb(n_estimadores: int, **extras) -> XGBRegressor:
@@ -24,12 +44,22 @@ def _rf(n_estimadores: int) -> RandomForestRegressor:
     )
 
 
+def _ajustar(treino: pd.DataFrame, n_estimadores: int, **extras) -> EstimadorOD:
+    # os lagos de treino ficam perto do nível do mar: a saturação deles é a de 1 atm
+    fracao = treino["od"] / od_saturacao(treino["temperatura"])
+    modelo = _xgb(n_estimadores, monotone_constraints=MONOTONIA, **extras).fit(treino[FEATURES_OD], fracao)
+    return EstimadorOD(modelo)
+
+
+def treinar_od_central(treino: pd.DataFrame, n_estimadores: int = 300) -> EstimadorOD:
+    return _ajustar(treino, n_estimadores)
+
+
 def treinar_od(treino: pd.DataFrame, n_estimadores: int = 300) -> dict:
-    """XGBoost do OD e os dois de quantil (intervalo de 80%); `treino` tem temperatura, ph e od."""
-    X, y = treino[FEATURES_OD], treino["od"]
-    modelos = {"od": _xgb(n_estimadores).fit(X, y)}
+    """Estimador do OD e os dois de quantil (intervalo de 80%); `treino` tem temperatura, ph e od."""
+    modelos = {"od": treinar_od_central(treino, n_estimadores)}
     for nome, alfa in QUANTIS.items():
-        modelos[nome] = _xgb(n_estimadores, objective="reg:quantileerror", quantile_alpha=alfa).fit(X, y)
+        modelos[nome] = _ajustar(treino, n_estimadores, objective="reg:quantileerror", quantile_alpha=alfa)
     return modelos
 
 
@@ -39,11 +69,10 @@ def od_fora_da_dobra(treino: pd.DataFrame, n_estimadores: int = 300) -> np.ndarr
     É o que o classificador de risco recebe no treino: um modelo que já viu o
     lago estimaria o OD dele melhor do que vai estimar o do aquário.
     """
-    X, y = treino[FEATURES_OD], treino["od"]
     previsto = np.empty(len(treino))
-    for dentro, fora in LeaveOneGroupOut().split(X, y, treino["grupo"]):
-        modelo = _xgb(n_estimadores).fit(X.iloc[dentro], y.iloc[dentro])
-        previsto[fora] = modelo.predict(X.iloc[fora])
+    for dentro, fora in LeaveOneGroupOut().split(treino, groups=treino["grupo"]):
+        modelo = treinar_od_central(treino.iloc[dentro], n_estimadores)
+        previsto[fora] = modelo.predict(treino.iloc[fora])
     return previsto
 
 
@@ -57,10 +86,10 @@ def metricas_od(y_real, y_previsto, faixa: FaixaEspecie) -> dict:
 
 
 def comparar_od(treino: pd.DataFrame, teste: pd.DataFrame, faixa: FaixaEspecie, n_estimadores: int = 300) -> dict:
-    """Treina XGBoost, Random Forest e a mediana em `treino` e mede os três em `teste`."""
+    """Treina o estimador (XGBoost), Random Forest e a mediana em `treino` e mede os três em `teste`."""
     X, y = treino[FEATURES_OD], treino["od"]
     previsoes = {
-        "xgboost": _xgb(n_estimadores).fit(X, y).predict(teste[FEATURES_OD]),
+        "xgboost": treinar_od_central(treino, n_estimadores).predict(teste),
         "random_forest": _rf(n_estimadores // 3).fit(X, y).predict(teste[FEATURES_OD]),
         "mediana": np.full(len(teste), float(np.median(y))),
     }

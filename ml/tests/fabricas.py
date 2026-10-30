@@ -54,4 +54,5 @@ def pacote_sintetico(n_estimadores: int = 20) -> dict:
         serie["od_estimado"] = modelos_od["od"].predict(serie[FEATURES_OD])
     dataset = montar_dataset_risco(series, grupos_dos_pontos(bruto), TILAPIA, cobertura_min_blocos=3)
     modelos_risco = treinar_risco(dataset, n_estimadores)
-    return montar_pacote(modelos_od, modelos_risco, TILAPIA, {"sintetico/2023-12.rdb": "0" * 64})
+    dominio_od = {g: [float(v) for v in np.percentile(validas[g], [1, 99])] for g in FEATURES_OD}
+    return montar_pacote(modelos_od, modelos_risco, TILAPIA, {"sintetico/2023-12.rdb": "0" * 64}, dominio_od)

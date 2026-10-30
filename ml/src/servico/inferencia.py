@@ -8,6 +8,7 @@ from src.faixas import NOMES_NIVEL, FaixaEspecie, nivel, parametro_critico
 from src.features import calcular_features, cobertura, nomes_features
 from src.pacote import VERSAO_PACOTE
 from src.treino.modelo_od import FEATURES_OD
+from src.treino.modelo_risco import prever_risco
 from src.treino.rotulos import HORIZONTES_H
 
 ATRASO_MAX = timedelta(minutes=30)
@@ -25,12 +26,16 @@ class Previsao:
 
 
 class Inferencia:
-    def __init__(self, pacote: dict, cobertura_min_blocos: int) -> None:
+    def __init__(self, pacote: dict, cobertura_min_blocos: int, altitude_m: float = 0.0) -> None:
         if pacote.get("versao") != VERSAO_PACOTE:
             raise ValueError(f"pacote de modelos versão {pacote.get('versao')}, esperava {VERSAO_PACOTE}: retreine")
         if pacote["features"] != nomes_features():
             raise ValueError("modelos treinados com variáveis diferentes das de features.py: retreine")
         self._od = pacote["od"]
+        # o estimador devolve fração de saturação vezes o OD de saturação na altitude do tanque
+        for modelo in self._od.values():
+            modelo.altitude_m = altitude_m
+        self._dominio = pacote["dominio_od"]
         self._risco = pacote["risco"]
         self._cobertura_min = cobertura_min_blocos
 
@@ -62,31 +67,36 @@ class Inferencia:
             atual, variaveis, faixa
         )
 
+    def fora_do_dominio(self, entrada: pd.DataFrame) -> bool:
+        """T ou pH fora do que o estimador de OD viu no treino (percentis 1 e 99)."""
+        return any(
+            not (lo <= float(entrada[g].iloc[0]) <= hi) for g, (lo, hi) in self._dominio.items()
+        )
+
     def _previsao_od(self, atual: pd.Series, faixa: FaixaEspecie, entrada: pd.DataFrame) -> Previsao:
         q10 = float(self._od["od_q10"].predict(entrada)[0])
         q90 = float(self._od["od_q90"].predict(entrada)[0])
         od_min, od_max = faixa.limites("od")
         confianca = float(np.clip(1 - abs(q90 - q10) / (od_max - od_min), 0, 1))
+        # fora do domínio os quantis podem ficar estreitos por acaso: o intervalo não vale ali
+        if self.fora_do_dominio(entrada):
+            confianca = 0.0
         return Previsao(0, "od", float(atual["od"]), NOMES_NIVEL[nivel(atual["od"], "od", faixa)], confianca)
 
     def _previsoes_risco(self, atual: pd.Series, variaveis: pd.DataFrame, faixa: FaixaEspecie) -> list[Previsao]:
-        ultimos = {g: float(atual[g]) for g in ("ph", "temperatura", "od")}
-        parametro = parametro_critico(ultimos, faixa)
-        minimo, maximo = faixa.limites(parametro)
-        # inclinação de 60 min volta da escala normalizada para a unidade da grandeza (por hora)
-        inclinacao = float(variaveis[f"{parametro}_incl_60"].iloc[0]) * (maximo - minimo)
-
+        linhas = variaveis.assign(ph_agora=float(atual["ph"]), temperatura_agora=float(atual["temperatura"]))
         previsoes = []
         for h in HORIZONTES_H:
-            probabilidades = self._risco[h].predict_proba(variaveis)[0]
-            classe = int(np.argmax(probabilidades))
+            niveis_h, confianca, valores = prever_risco(self._risco[h], self._od["od"], linhas, faixa)
+            futuros = {g: float(np.clip(valores[g][0], *LIMITES_FISICOS[g])) for g in ("ph", "temperatura", "od")}
+            parametro = parametro_critico(futuros, faixa)
             previsoes.append(
                 Previsao(
                     horizonte_h=h,
                     parametro_critico=parametro,
-                    valor_previsto=float(np.clip(ultimos[parametro] + inclinacao * h, *LIMITES_FISICOS[parametro])),
-                    nivel_risco=NOMES_NIVEL[classe],
-                    confianca=float(probabilidades[classe]),
+                    valor_previsto=futuros[parametro],
+                    nivel_risco=NOMES_NIVEL[int(niveis_h[0])],
+                    confianca=float(confianca[0]),
                 )
             )
         return previsoes

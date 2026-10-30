@@ -52,17 +52,44 @@ def test_ct02_ph_caindo_aponta_ph_como_parametro_critico(db, pacote):
     assert [l.parametro_critico for l in linhas[1:]] == ["ph", "ph", "ph"]
 
 
-def test_projecao_nao_sai_da_faixa_fisica(db, pacote):
+def test_previsao_nao_sai_da_faixa_fisica(db, pacote):
     with db.begin() as conn:
-        # pH despencando ~3 unidades por hora: a projeção linear de 3 h daria negativo
+        # pH despencando ~3 unidades por hora: uma reta de 3 h daria pH negativo
         _com_leituras(conn, minutos=90, ph=list(np.linspace(8.0, 3.4, 90)))
     _ciclo(db, pacote)
     with db.connect() as conn:
-        valores = conn.execute(
-            text("SELECT valor_previsto FROM previsoes WHERE horizonte_h > 0 ORDER BY horizonte_h")
-        ).scalars().all()
-    assert [float(v) for v in valores][-1] == 0.0
-    assert all(0.0 <= float(v) <= 14.0 for v in valores)
+        linhas = conn.execute(
+            text("SELECT parametro_critico, valor_previsto, nivel_risco FROM previsoes WHERE horizonte_h > 0 ORDER BY horizonte_h")
+        ).all()
+    assert all(0.0 <= float(l.valor_previsto) <= 14.0 for l in linhas)
+    assert all(l.nivel_risco == "critico" for l in linhas)
+
+
+def test_od_fora_do_dominio_de_treino_tem_confianca_zero(db, pacote):
+    with db.begin() as conn:
+        # pH 4,0: abaixo do percentil 1 do treino do estimador de OD
+        _com_leituras(conn, minutos=90, ph=[4.0] * 90)
+    _ciclo(db, pacote)
+    with db.connect() as conn:
+        assert float(_previsoes(conn)[0].confianca) == 0.0
+
+
+def test_od_dentro_do_dominio_mantem_a_confianca_dos_quantis(pacote):
+    inferencia = Inferencia(pacote, cobertura_min_blocos=3)
+    lo_ph, hi_ph = pacote["dominio_od"]["ph"]
+    lo_t, hi_t = pacote["dominio_od"]["temperatura"]
+    meio = pd.DataFrame({"temperatura": [(lo_t + hi_t) / 2], "ph": [(lo_ph + hi_ph) / 2]})
+    assert not inferencia.fora_do_dominio(meio)
+    assert inferencia.fora_do_dominio(meio.assign(ph=lo_ph - 0.1))
+    assert inferencia.fora_do_dominio(meio.assign(temperatura=hi_t + 0.1))
+
+
+def test_altitude_reduz_o_od_estimado(pacote):
+    entrada = pd.DataFrame({"temperatura": [25.0], "ph": [7.5]})
+    nivel_mar = float(Inferencia(pacote, 3, altitude_m=0)._od["od"].predict(entrada)[0])
+    sao_paulo = float(Inferencia(pacote, 3, altitude_m=760)._od["od"].predict(entrada)[0])
+    Inferencia(pacote, 3, altitude_m=0)  # devolve o pacote da sessão ao nível do mar
+    assert sao_paulo / nivel_mar == pytest.approx(0.91, abs=0.01)
 
 
 def test_bloco_corrente_ainda_sem_leitura_nao_vira_indeterminado(db, pacote):
