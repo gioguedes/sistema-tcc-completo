@@ -34,7 +34,7 @@ def _ciclo(db, pacote) -> dict:
 def test_ciclo_grava_4_previsoes_validas(db, pacote):
     with db.begin() as conn:
         _com_leituras(conn, minutos=90)
-    assert _ciclo(db, pacote) == {"gravados": 1, "indeterminados": 0, "erros": 0}
+    assert _ciclo(db, pacote) == {"gravados": 1, "indeterminados": 0, "erros": 0, "aerador": 0}
     with db.connect() as conn:
         linhas = _previsoes(conn)
     assert [l.horizonte_h for l in linhas] == [0, 1, 2, 3]
@@ -122,7 +122,7 @@ def test_erro_em_um_tanque_nao_impede_os_outros(db, pacote, monkeypatch):
     monkeypatch.setattr(inferencia, "prever", prever_falha_no_primeiro)
 
     contagem = executar_ciclo(db, inferencia, confianca_min=0.5, agora=AGORA)
-    assert contagem == {"gravados": 1, "indeterminados": 0, "erros": 1}
+    assert contagem == {"gravados": 1, "indeterminados": 0, "erros": 1, "aerador": 0}
     with db.connect() as conn:
         tanques = conn.execute(text("SELECT DISTINCT id_tanque FROM previsoes")).scalars().all()
     assert tanques == [segundo["id_tanque"]]

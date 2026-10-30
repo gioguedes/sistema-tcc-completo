@@ -19,6 +19,15 @@ class Settings(BaseSettings):
     ml_confianca_min: float = 0.5
     ml_cobertura_min_blocos: int = 3
 
+    # aerador automático (desligado por padrão: o comando manual do painel continua valendo)
+    ml_aerador_automatico: bool = False
+    ml_aerador_liga_od: float = 4.0
+    ml_aerador_desliga_od: float = 5.0
+    ml_aerador_pausa_manual_min: int = 30
+    mqtt_broker_host: str = ""
+    mqtt_broker_port: int = 1883
+    mqtt_topic_prefix: str = ""
+
     @property
     def database_url(self) -> str:
         return (
