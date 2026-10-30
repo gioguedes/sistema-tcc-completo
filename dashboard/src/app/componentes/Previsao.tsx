@@ -89,7 +89,7 @@ export function PrevisaoPorHorizonte({ previsao }: { previsao: PrevisaoAtual | u
               <p className="text-sm font-semibold">Em {h.horizonte_h === 1 ? '1 hora' : `${h.horizonte_h} horas`}</p>
               <p className="text-xs text-tinta-suave">
                 {rotulo(h.parametro_critico)}: ≈ {formatarValor(h.parametro_critico, h.valor_previsto)}
-                {modoAvancado && h.confianca !== null && ` · probabilidade ${percentual(h.confianca)}`}
+                {modoAvancado && h.confianca !== null && ` · confiança ${percentual(h.confianca)}`}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -101,8 +101,8 @@ export function PrevisaoPorHorizonte({ previsao }: { previsao: PrevisaoAtual | u
       </ul>
       {modoAvancado && horizontes.length > 0 && (
         <p className="mt-2 text-xs text-tinta-suave">
-          O nível de cada horizonte vem do modelo de Machine Learning. O valor com “≈” é uma projeção indicativa da
-          grandeza mais perto de sair da faixa.
+          O modelo de Machine Learning prevê o pH e a temperatura de cada horizonte e aplica as faixas da espécie. O
+          valor com “≈” é o previsto para a grandeza mais perto de sair da faixa.
         </p>
       )}
     </div>
