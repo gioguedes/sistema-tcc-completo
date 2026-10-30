@@ -25,7 +25,11 @@ class ConsumerMqtt:
         self._session_factory = session_factory
         self._processor = processor
 
-        self._client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        # sessão persistente: com client_id fixo e clean_session=False, o broker guarda as leituras
+        # QoS 1 que chegarem enquanto a ingestão estiver fora e entrega quando ela voltar
+        self._client = mqtt.Client(
+            mqtt.CallbackAPIVersion.VERSION2, client_id=f"ingestao-{topico_prefixo}", clean_session=False
+        )
         self._client.on_connect = self._ao_conectar
         self._client.on_message = self._ao_receber_mensagem
 
@@ -39,6 +43,13 @@ class ConsumerMqtt:
             payload = LeituraMqttPayload(**dados)
         except Exception:
             logger.exception("payload invalido no topico %s, descartando", msg.topic)
+            return
+
+        # o broker é público: o nó só publica no tópico do próprio MAC, então MAC do tópico
+        # diferente do MAC do payload é leitura forjada ou nó mal configurado
+        mac_topico = msg.topic.split("/")[-2] if msg.topic.count("/") >= 2 else ""
+        if mac_topico.lower() != payload.mac.replace(":", "").lower():
+            logger.warning("mac do payload (%s) nao bate com o do topico %s, descartando", payload.mac, msg.topic)
             return
 
         try:
