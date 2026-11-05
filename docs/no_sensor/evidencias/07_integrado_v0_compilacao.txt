@@ -1,0 +1,18 @@
+Evidência — Task 7: firmware integrado v0 — COMPILAÇÃO
+Data: 2026-08-17
+Sketch: firmware/no_sensor (config.h local, fora do git)
+Comando: arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all --clean
+(arduino-cli embutido no Arduino IDE 2.x — ver docs/compilar.md)
+
+--- Saída ---
+Sketch uses 348879 bytes (26%) of program storage space. Maximum is 1310720 bytes.
+Global variables use 24032 bytes (7%) of dynamic memory, leaving 303648 bytes for local variables. Maximum is 327680 bytes.
+
+Warnings: nenhum nos arquivos do projeto.
+Os 4 warnings da compilação limpa vêm de dependências externas:
+  - OneWire.cpp:599/600 (extra tokens at end of #undef)
+  - core ESP32 3.3.10, driver/gpio.h:25 (comparison always true), 2x
+
+PENDENTE: gravar na placa e capturar o Serial (precisa do LED de status
+religado no GPIO13 — ver docs/bancada.md). Evidência do Serial vai para
+docs/evidencias/07_integrado_v0_serial.txt.

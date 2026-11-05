@@ -18,3 +18,10 @@ build/
 
 # modelos treinados (regeneraveis com python -m src.treino)
 ml/modelos/
+
+# firmware: segredos (Wi-Fi, broker, calibração local)
+firmware/no_sensor/config.h
+ferramentas/broker.log
+
+# logs do ferramentas/demonstracao.sh
+.demo_logs/

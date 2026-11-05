@@ -1,0 +1,25 @@
+Task 3 — validação do módulo relé (GPIO26)
+Data: 2026-07-09
+
+Trecho do Serial (teste_rele.ino, 115200 baud):
+
+Saida GPIO26 = LOW
+Saida GPIO26 = HIGH
+Saida GPIO26 = LOW
+Saida GPIO26 = HIGH
+Saida GPIO26 = LOW
+
+Comportamento observado: clique a cada 3 s; o relé arma (LED verde do módulo
+aceso) quando o Serial mostra LOW e desarma quando mostra HIGH, em sincronia.
+
+Polaridade observada: ativo-baixo
+
+Observação de alimentação (achado da bancada): com o VCC do módulo em 5 V,
+o nível HIGH de 3,3 V do ESP32 NÃO desarma o relé — ele arma e fica preso
+armado (3,3 V não é suficiente para apagar o optoacoplador alimentado a 5 V).
+Alimentando o módulo com 3V3, arma/desarma funcionam normalmente e a bobina
+atraca com folga. Decisão: módulo relé alimentado em 3V3.
+
+Consequência para o firmware integrado: lógica invertida —
+digitalWrite(PIN_RELE, HIGH) = relé DESLIGADO; inicializar o pino em HIGH
+no setup() para o relé não armar no boot.

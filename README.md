@@ -24,7 +24,7 @@ nó ESP32 ──MQTT QoS 1──► broker ──► ingestão (backend/src/mqtt
 | `dashboard/` | Painel React (PWA), com modo simulado (MSW) ou ligado à API real | [`dashboard/README.md`](dashboard/README.md) |
 | `docs/evidencias/` | Evidências dos casos de teste (CT02 ponta a ponta) | |
 
-O firmware do nó sensor e o modelo 3D da caixa ficam num repositório separado.
+O firmware do nó sensor fica em `firmware/`, o modelo 3D da caixa em `hardware/caixa/`, as evidências de bancada em `docs/no_sensor/evidencias/` e os scripts de execução em `ferramentas/`.
 
 ## Como rodar
 
@@ -60,8 +60,8 @@ Sem o nó físico, `backend/scripts/simular_leituras.py` publica leituras no mes
 ## Testes
 
 ```bash
-cd backend && .venv/Scripts/python -m pytest      # 110 testes (precisam do banco e do mosquitto-test)
-cd ml && .venv/Scripts/python -m pytest           # 124 testes (criam o banco piscicultura_ml_test)
+cd backend && .venv/Scripts/python -m pytest      # 111 testes (precisam do banco e do mosquitto-test)
+cd ml && .venv/Scripts/python -m pytest           # 128 testes (criam o banco piscicultura_ml_test)
 cd dashboard && npm test                          # 41 testes
 ```
 

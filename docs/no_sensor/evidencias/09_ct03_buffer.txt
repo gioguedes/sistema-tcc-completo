@@ -1,0 +1,149 @@
+CT03 -- Buffer offline com ressincronizacao FIFO (Task 9)
+=========================================================
+Data: 23/08/2026, ~21:34 BRT
+Firmware: firmware/no_sensor v2 (buffer_leituras.h + no_sensor.ino + gatilho em rede.h)
+Placa: ESP32 DevKitC 38 pinos, MAC a4:f0:0f:64:3c:70, COM3
+Broker: broker.hivemq.com:1883 (publico; o Mosquitto local segue inalcancavel pelo NAT
+        do Mac -- ver 08_rede_topologia.txt)
+Topico: tcc-piscicultura-morgado/a4f00f643c70/leituras
+Intervalo de leitura: 10 s (valor de bancada; a spec pede 60 s em producao)
+
+O QUE O CT03 EXIGE (TC1: fluxo A05.1, RNF04)
+--------------------------------------------
+Perdido o Wi-Fi, o no mantem feedback local, bufferiza as leituras e ressincroniza
+ao reconectar, preservando o timestamp original.
+
+COMO A QUEDA FOI PROVOCADA
+--------------------------
+Por comando "queda" no Serial, que chama redeSimularQueda(45000) -> desliga a
+reconexao automatica e derruba o radio por 45 s.
+
+Desligar o roteador NAO serve de teste nesta bancada: a internet do PC vem por cabo
+do Mac que a compartilha, entao o roteador cair tiraria o broker do ar junto com o no,
+e o cenario deixaria de ser "no offline, broker de pe". O gatilho por Serial isola a
+falha no no e e reproduzivel.
+
+RESULTADO: PASSOU
+-----------------
+  * 4 leituras entraram no buffer durante a janela offline (buffer=1,2,3,4);
+  * na volta, as 4 foram publicadas em ordem FIFO com o ts ORIGINAL, antes da leitura
+    nova (ts 1787531748) -- ou seja, a fila drenou pelo comeco, nao pelo fim;
+  * nenhuma leitura perdida e nenhuma duplicada: 14 mensagens no broker, 14 ts distintos,
+    espacados de 10 s sem furo entre 1787531666 e 1787531798;
+  * o fluxo normal voltou sozinho (buffer=1 -> publica -> 0 na fila).
+
+Comparacao com o v1 (08_mqtt_publicacao.txt, mesma bancada): com o publish falhando, o v1 perdeu
+2 de 6 leituras, porque publicava direto do ciclo de leitura e descartava o que nao
+saia. Esse era o teste que reprovava antes do buffer existir.
+
+EVIDENCIA NO BROKER (hora de chegada ~ payload)
+-----------------------------------------------
+Ler as duas colunas juntas e o ponto do teste: entre 21:34:56 e 21:35:49 o broker fica
+53 s MUDO (a janela offline). Em seguida chegam 5 mensagens em ~2 s -- a rajada de
+ressincronizacao -- e cada uma traz um ts do passado, 10 s a mais que a anterior.
+A hora de chegada e a hora do dado se separam, o que e exatamente o comportamento
+que o buffer tem que produzir.
+
+2026-08-23T21:34:26-0300~{"mac":"a4f00f643c70","ts":1787531666,"ph":5.05,"temperatura":24.81,"turbidez":31.75}
+2026-08-23T21:34:36-0300~{"mac":"a4f00f643c70","ts":1787531676,"ph":5.05,"temperatura":25,"turbidez":34}
+2026-08-23T21:34:46-0300~{"mac":"a4f00f643c70","ts":1787531686,"ph":5.03,"temperatura":25,"turbidez":32.49}
+2026-08-23T21:34:56-0300~{"mac":"a4f00f643c70","ts":1787531696,"ph":5.03,"temperatura":25,"turbidez":33.46}
+2026-08-23T21:35:49-0300~{"mac":"a4f00f643c70","ts":1787531706,"ph":5.11,"temperatura":25,"turbidez":16.04}
+2026-08-23T21:35:50-0300~{"mac":"a4f00f643c70","ts":1787531716,"ph":5.05,"temperatura":25,"turbidez":17.73}
+2026-08-23T21:35:50-0300~{"mac":"a4f00f643c70","ts":1787531726,"ph":5.08,"temperatura":25,"turbidez":17.41}
+2026-08-23T21:35:51-0300~{"mac":"a4f00f643c70","ts":1787531736,"ph":5.05,"temperatura":25,"turbidez":18.32}
+2026-08-23T21:35:51-0300~{"mac":"a4f00f643c70","ts":1787531748,"ph":5.1,"temperatura":25.06,"turbidez":34.31}
+2026-08-23T21:35:59-0300~{"mac":"a4f00f643c70","ts":1787531758,"ph":5.05,"temperatura":25.06,"turbidez":32.31}
+2026-08-23T21:36:09-0300~{"mac":"a4f00f643c70","ts":1787531768,"ph":5.07,"temperatura":25.06,"turbidez":32.03}
+2026-08-23T21:36:19-0300~{"mac":"a4f00f643c70","ts":1787531778,"ph":5.02,"temperatura":25.06,"turbidez":32.41}
+2026-08-23T21:36:29-0300~{"mac":"a4f00f643c70","ts":1787531788,"ph":5.02,"temperatura":25.06,"turbidez":34.87}
+2026-08-23T21:36:39-0300~{"mac":"a4f00f643c70","ts":1787531798,"ph":5.02,"temperatura":25.06,"turbidez":33.08}
+
+CAPTURA DO SERIAL
+-----------------
+ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:1
+load:0x3fff0030,len:4876
+ho 0 tail 12 room 4
+load:0x40078000,len:16560
+load:0x40080400,len:3500
+entry 0x400805b4
+  continuidade do LED: pull-up=0 pull-down=0 -> LED NO CIRCUITO (caminho ate o terra existe)
+
+no_sensor v2 - leitura integrada + MQTT QoS 1 + buffer offline
+AVISO: pH usa constantes de fabrica (nao calibrado). O valor de pH
+       serve para conferir a resposta do sensor, nao como medida.
+Intervalo de leitura: 10000 ms | buffer: 120 leituras
+Comandos no Serial: queda | buffer
+Rede: SSID "[rede Wi-Fi]", broker broker.hivemq.com:1883
+Topico: tcc-piscicultura-morgado/a4f00f643c70/leituras
+Rede: Wi-Fi OK ip=192.168.15.15 rssi=-23 dBm
+Rede: relogio sincronizado (epoch=1787531663)
+Leitura na fila (buffer=1): ph=5.05 temp=24.8 turb=31.8
+Rede: MQTT conectado (online)
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787531666,"ph":5.05,"temperatura":24.81,"turbidez":31.75}
+Leitura na fila (buffer=1): ph=5.05 temp=25.0 turb=34.0
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787531676,"ph":5.05,"temperatura":25,"turbidez":34}
+Leitura na fila (buffer=1): ph=5.03 temp=25.0 turb=32.5
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787531686,"ph":5.03,"temperatura":25,"turbidez":32.49}
+Leitura na fila (buffer=1): ph=5.03 temp=25.0 turb=33.5
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787531696,"ph":5.03,"temperatura":25,"turbidez":33.46}
+TESTE: derrubando o Wi-Fi por 45000 ms (CT03)
+Leitura na fila (buffer=1): ph=5.11 temp=25.0 turb=16.0
+Leitura na fila (buffer=2): ph=5.05 temp=25.0 turb=17.7
+Leitura na fila (buffer=3): ph=5.08 temp=25.0 turb=17.4
+Leitura na fila (buffer=4): ph=5.05 temp=25.0 turb=18.3
+TESTE: fim da janela offline, religando o Wi-Fi
+Rede: Wi-Fi OK ip=192.168.15.15 rssi=-61 dBm
+Leitura na fila (buffer=5): ph=5.10 temp=25.1 turb=34.3
+Rede: MQTT conectado (online)
+Publicado (4 na fila): {"mac":"a4f00f643c70","ts":1787531706,"ph":5.11,"temperatura":25,"turbidez":16.04}
+Publicado (3 na fila): {"mac":"a4f00f643c70","ts":1787531716,"ph":5.05,"temperatura":25,"turbidez":17.73}
+Publicado (2 na fila): {"mac":"a4f00f643c70","ts":1787531726,"ph":5.08,"temperatura":25,"turbidez":17.41}
+Publicado (1 na fila): {"mac":"a4f00f643c70","ts":1787531736,"ph":5.05,"temperatura":25,"turbidez":18.32}
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787531748,"ph":5.1,"temperatura":25.06,"turbidez":34.31}
+Leitura na fila (buffer=1): ph=5.05 temp=25.1 turb=32.3
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787531758,"ph":5.05,"temperatura":25.06,"turbidez":32.31}
+Leitura na fila (buffer=1): ph=5.07 temp=25.1 turb=32.0
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787531768,"ph":5.07,"temperatura":25.06,"turbidez":32.03}
+Leitura na fila (buffer=1): ph=5.02 temp=25.1 turb=32.4
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787531778,"ph":5.02,"temperatura":25.06,"turbidez":32.41}
+
+OBSERVACAO ELETRICA NAO PREVISTA: O RADIO DESLOCA A TURBIDEZ
+------------------------------------------------------------
+Com o Wi-Fi no ar a turbidez le 32-35 NTU; nos 45 s de radio desligado caiu para
+16-18 NTU e voltou ao patamar anterior no primeiro ciclo apos reconectar. Pela curva
+em uso (TURB_MV_0NTU=2656, TURB_MV_100NTU=2010, fator 2,0), 16 NTU de diferenca
+equivalem a ~103 mV no no do divisor, ~51 mV no pino.
+
+Nao e efeito de potencia de transmissao: o RSSI mudou de -23 para -61 dBm entre antes
+e depois, e o valor voltou ao mesmo patamar. Tambem nao e deslocamento comum do ADC --
+no mesmo intervalo o pH (GPIO35) variou o equivalente a ~15 mV, um terco disso. A
+hipotese mais provavel e sag do trilho de 5 V que alimenta o modulo de turbidez, vindo
+dos picos de corrente do radio (o 5 V vem do USB, sem capacitor de desacoplamento).
+
+Consequencia pratica: em operacao o radio esta sempre ligado, entao isso e um offset
+sistematico, nao um erro variavel -- MENOS nas leituras bufferizadas, que sao tiradas
+justamente com o radio fora do ar e portanto carregam ~16 NTU de vies em relacao as
+demais. Com a curva de turbidez ainda por calibrar (falta o segundo ponto de ~100 NTU),
+isso reforca a limitacao ja declarada na spec, secao 5: o valor tem funcao de
+tendencia/alerta, nao de medicao. Encaminhamento sugerido: 100 uF eletrolitico +
+100 nF ceramico no VCC/GND do modulo de turbidez e repetir esta medicao.
+
+PENDENCIAS QUE ESTE TESTE NAO COBRE
+-----------------------------------
+  * Feedback local (OLED "OFFLINE (n buf.)", bip curto na transicao, LED piscando
+    rapido): implementado e no caminho de execucao, mas a confirmacao visual na
+    bancada nao foi registrada nesta rodada -- a janela de 45 s correu dentro de um
+    unico comando, sem aviso ao vivo para o observador. Repetivel a qualquer momento
+    com o comando "queda" no Serial.
+  * Estouro do buffer (120 leituras, ~2 h a 60 s): o codigo trata via janela deslizante
+    e contabiliza em bufferDescartadas(), inspecionavel pelo comando "buffer" no Serial,
+    mas 2 h de queda nao foram executadas.
+  * Duplicata por PUBACK perdido: nao ocorreu nesta rodada (nenhum erro -9). O caminho
+    existe e e legitimo no QoS 1 (at-least-once) -- o backend do sub-projeto 2 tem que
+    deduplicar por (mac, ts).

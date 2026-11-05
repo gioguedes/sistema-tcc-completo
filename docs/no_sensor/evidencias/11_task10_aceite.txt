@@ -1,0 +1,150 @@
+================================================================================
+TASK 10 - CRITERIOS DE ACEITE DO NO SENSOR (spec secao 8)
+Sessao de 2026-08-31. Firmware: firmware/no_sensor, INTERVALO_LEITURA_MS = 60000UL.
+Placa: ESP32-D0WD-V3 rev v3.1, MAC a4:f0:0f:64:3c:70, COM3.
+================================================================================
+
+RESUMO
+------
+Criterio 1 (sensores + calibracao do pH) ... PARCIAL - bloqueado por compra
+Criterio 2 (publicacao a cada 60 s) ....... APROVADO
+Criterio 3 (resiliencia / CT03) ........... APROVADO em 23/08 (evidencia 09)
+Criterio 4 (robustez de sensor) ........... APROVADO
+
+
+BOOT COM O FIRMWARE DE ENTREGA
+------------------------------
+ets Jul 29 2019 12:21:46
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+...
+no_sensor v2 - leitura integrada + MQTT QoS 1 + buffer offline
+AVISO: pH usa constantes de fabrica (nao calibrado). O valor de pH
+       serve para conferir a resposta do sensor, nao como medida.
+Intervalo de leitura: 60000 ms | buffer: 120 leituras
+Comandos no Serial: queda | ler | buffer
+Rede: SSID "[rede Wi-Fi]", broker broker.hivemq.com:1883
+Topico: tcc-piscicultura-morgado/a4f00f643c70/leituras
+Rede: Wi-Fi OK ip=192.168.15.25 rssi=-25 dBm
+Rede: relogio sincronizado (epoch=1788223180)
+Leitura na fila (buffer=1): ph=4.41 temp=26.9 turb=32.4
+Rede: MQTT conectado (online)
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1788223181,"ph":4.41,"temperatura":26.88,"turbidez":32.37}
+
+Boot inteiro em 1118 bytes / 23 linhas de Serial. Sem resets em sequencia,
+sem linhas repetidas.
+
+
+CRITERIO 2 - PUBLICACAO A CADA 60 s
+-----------------------------------
+Captura de 200 s com carimbo de hora do PC em cada linha (a coluna [s] e o
+relogio do PC, o campo ts e o relogio do no, sincronizado por NTP):
+
+[  32,9s] Leitura na fila (buffer=1): ph=4.38 temp=28.5 turb=32.2
+[  33,4s] Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1788223301,"ph":4.38,"temperatura":28.5,"turbidez":32.22}
+[  92,9s] Leitura na fila (buffer=1): ph=4.46 temp=27.8 turb=32.0
+[  93,4s] Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1788223361,"ph":4.46,"temperatura":27.81,"turbidez":31.98}
+[ 152,9s] Leitura na fila (buffer=1): ph=4.48 temp=27.4 turb=33.1
+[ 153,5s] Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1788223421,"ph":4.48,"temperatura":27.38,"turbidez":33.13}
+
+Intervalo pelo relogio do PC:  32,9 -> 92,9 -> 152,9  = 60,0 s exatos
+Intervalo pelo ts do payload:  1788223301 -> 361 -> 421 = 60 s exatos
+JSON valido, com MAC, epoch plausivel (31/08/2026) e as tres grandezas.
+Fila sempre drenando para zero (o "(0 na fila)" de cada publicacao).
+
+
+CRITERIO 2 (bis) - RECEBIDO NO PC COM mosquitto_sub
+---------------------------------------------------
+A spec pede literalmente que "mosquitto_sub no PC exiba um JSON valido a cada
+60 s". Executado no proprio PC do projeto, assinando o broker publico em QoS 1:
+
+  mosquitto_sub -h broker.hivemq.com -p 1883 -t "tcc-piscicultura-morgado/a4f00f643c70/leituras" -q 1 -v
+
+  tcc-piscicultura-morgado/a4f00f643c70/leituras {"mac":"a4f00f643c70","ts":1788224121,"ph":4.4,"temperatura":29.31,"turbidez":35.54}
+  tcc-piscicultura-morgado/a4f00f643c70/leituras {"mac":"a4f00f643c70","ts":1788224181,"ph":4.38,"temperatura":28.44,"turbidez":35.45}
+  tcc-piscicultura-morgado/a4f00f643c70/leituras {"mac":"a4f00f643c70","ts":1788224241,"ph":4.51,"temperatura":27.94,"turbidez":35.92}
+
+ts 1788224121 -> 181 -> 241 = 60 s exatos entre mensagens.
+
+CONSEQUENCIA PARA O SUB-PROJETO 2: o NAT do Mac NAO bloqueia o backend. A
+documentacao anterior (proximos_passos.md secao 6) afirmava que sim. O que o NAT
+impede e a rede Wi-Fi ALCANCAR o PC - ou seja, o no usar um broker local rodando
+aqui. O backend entra no broker como CLIENTE, conexao de saida, exatamente como
+esta captura demonstra. O sub-projeto 2 pode comecar sem resolver a rede local.
+
+
+CRITERIO 4 - ROBUSTEZ DE SENSOR (DS18B20 arrancado em operacao)
+---------------------------------------------------------------
+Fio AMARELO (dados, linha 50) removido com o sistema rodando; leitura forcada
+pelo comando "ler" do Serial:
+
+Leitura na fila (buffer=1): ph=4.33 temp=nan turb=33.7
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1788223614,"ph":4.33,"temperatura":null,"turbidez":33.72}
+
+- Firmware NAO travou e seguiu publicando no ritmo normal
+- Temperatura publicada como null (nao zero, que seria dado plausivel e falso)
+- pH e turbidez continuaram validos na mesma leitura
+- OLED exibiu "T: ERRO" na linha da temperatura (confirmado visualmente)
+- Buzzer emitiu os dois bips da transicao de falha (uiBipDuplo, confirmado)
+
+Recuperacao apos recolocar o fio, sem reset da placa:
+
+Leitura antecipada para o proximo ciclo do laco.
+Leitura na fila (buffer=1): ph=4.43 temp=30.9 turb=40.7
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1788223761,"ph":4.43,"temperatura":30.94,"turbidez":40.7}
+
+(30,9 C porque a sonda acabara de ser manuseada; converge para os ~27 C do
+ambiente nos minutos seguintes.)
+
+
+CRITERIO 1 - POR QUE FICA PARCIAL
+---------------------------------
+Os tres sensores produzem leitura coerente e estavel:
+  pH          4,33 - 4,48  ao longo de toda a sessao, na solucao de guarda
+  temperatura 26,9 - 27,4  (ambiente), respondendo ao toque da mao
+  turbidez    32 - 33 NTU  (ver ressalva abaixo)
+
+Falta a calibracao de dois pontos do pH: os tampoes 4,01 / 6,86 nao foram
+comprados. O config.h esta com PH_CALIBRADO 0 e as constantes de fabrica, e o
+firmware avisa isso no boot. O valor de pH publicado hoje serve para conferir a
+resposta do sensor, NAO como medida - e assim deve ser descrito no TC2.
+Procedimento pronto em docs/calibracao_ph.md.
+
+
+ACHADO: TURBIDEZ NO AR NAO E MEDIDA REPRODUZIVEL
+------------------------------------------------
+Durante a sessao a mesma unidade, sempre no ar e com o radio ligado, leu:
+
+  19 NTU (24/08)  ->  36  ->  45  ->  60  ->  29  ->  32-33 (final)
+
+conforme era segurada, largada na mesa ou movida. Equivalente em tensao:
+2534 -> 2424 -> 2365 -> 2250 -> 2466 -> ~2440 mV. Reassentar os tres fios da
+placa (40f/41f/42f) e as duas pernas dos quatro resistores NAO mudou a leitura,
+o que descarta mau contato como causa.
+
+Conclusao: o sensor mede luz IR atravessando o vao, e no ar o que chega ao
+receptor depende de reflexo da mesa, luz ambiente e obstaculos por perto. O
+baseline de 2588 mV registrado em 17/08 vale para AQUELA posicao, nao como
+referencia absoluta. Comparacao de turbidez so tem sentido com o sensor imerso
+e em posicao fixa. Nao ha defeito comprovado na unidade.
+
+
+ARMADILHA DE FERRAMENTA: BACKLOG CORROMPIDO DO DRIVER CP210x
+------------------------------------------------------------
+Ao reabrir a porta serial depois de ela ter ficado fechada com a placa
+transmitindo, o driver despeja um bloco enorme de dados repetidos e truncados -
+tipicamente a cauda da ultima linha, como 'idez":33.04}' repetida centenas de
+milhares de vezes. Medido nesta sessao: 6,2 MB "em 40 s" e 434 KB "em 3 s",
+sendo que 115200 baud comporta no maximo 11,5 KB/s. Ou seja, o volume por si so
+ja prova que nao vem da UART em tempo real.
+
+Isso imita com perfeicao o flood de laco apertado corrigido em 23/08 e ja gerou
+duas cacadas a um bug que nao existe. Como distinguir, em ordem de custo:
+
+1. Carimbar CADA LINHA com o relogio do PC na captura. O backlog chega todo com
+   o mesmo carimbo ([0,0s]); o trafego real aparece espacado no tempo.
+2. Conferir a taxa contra o limite fisico do baud (115200 = 11,5 KB/s).
+3. Descartar o que chegar nos primeiros ~200 ms apos abrir a porta
+   (ReadExisting + DiscardInBuffer em laco) antes de comecar a valer.
+
+O firmware nunca floodou: apos reset limpo, 1118 bytes em 45 s e uma publicacao
+por minuto, como projetado.

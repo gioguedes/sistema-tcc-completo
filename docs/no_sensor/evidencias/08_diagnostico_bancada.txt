@@ -1,0 +1,63 @@
+Evidência — diagnóstico da bancada (sketch diagnostico_bancada)
+Data: 2026-08-17
+Captura via PowerShell lendo COM3 direto (o `arduino-cli monitor` não funciona
+redirecionado; ver docs/compilar.md).
+
+1) I2C .............. OLED SSD1306 em 0x3C — OK
+2) 1-Wire ........... DS18B20 detectado, ROM 282061B10000006A
+                      temperatura -127.00 C = LEITURA INVALIDA
+3) Analogicas ....... GPIO36 (livre)     286 mV
+                      GPIO39 (livre)     290 mV
+                      GPIO34 (turbidez) 1291 mV -> 2582 mV reais (baseline do ar: OK)
+                      GPIO35 (pH)       1944 mV (eletrodo na garrafinha: OK)
+4) Amarracao ........ 32/33 (I2C)  PRESO EM 3V3   <- pull-ups do OLED, esperado
+                      25 (DS18B20) PRESO EM 3V3   <- pull-up 4,7k, esperado
+                      26 (rele IN) PRESO EM 3V3   <- pull-up interno do modulo
+                      27, 14       livres
+                      12 (buzzer)  livre          <- buzzer passivo = alta impedancia em DC
+                      13 (LED)     PRESO NO TERRA <- ver analise
+
+ANALISE
+
+- Turbidez viva e seca: 2582 mV reais batem com o baseline do ar de 02/07
+  (2598 mV). A secagem funcionou; falta so vedar antes de reimergir.
+- pH estavel em 1944 mV, coerente com 1920 mV de 09/07. BNC travado.
+- DS18B20: o sensor RESPONDE ao barramento (ROM lida com CRC valido) mas nao
+  converte. Sintoma classico de VDD ausente: sem os 3,3 V ele opera em modo
+  parasita e a conversao falha sem strong pull-up. A linha 55 tem 3,3 V (é o
+  que segura o pull-up do GPIO25 em nivel alto), entao a suspeita e o fio
+  VERMELHO fora do furo 55f — os fios desse sensor ja soltaram 2x antes.
+- GPIO13 "PRESO NO TERRA" NAO indica curto: com o pull-up interno (~45 k) e um
+  LED (Vf ~1,8 V) em serie com 330R ate o terra, o pino fica em ~1,8 V, abaixo
+  do limiar de nivel alto (2,48 V). Ou seja, essa leitura e o que um LED
+  corretamente montado produz. Confirmar visualmente na varredura de saidas.
+
+=== SEGUNDA RODADA (mesma data, apos instrumentar) ===
+
+Reconectado o fio VERMELHO (VDD) do DS18B20 na linha 55. Com o firmware antigo
+a leitura CONTINUOU em -127; com o diagnostico instrumentado:
+
+  alimentacao: VDD presente (alimentacao externa OK)
+  resolucao lida do scratchpad: 12 bits
+  tentativa 1: 27.56 C
+  tentativa 2: 27.50 C
+  tentativa 3: 27.50 C
+
+  GPIO34 (turbidez) 1294 mV -> 2588 mV reais
+  GPIO35 (pH)       1938 mV
+
+CAUSA RAIZ DO -127 (nao era o fio): o sensor esta em 12 bits, que exigem 750 ms
+de conversao. Quando a DallasTemperature nao conhece a resolucao do dispositivo,
+ela assume 9 bits e espera ~94 ms — le o scratchpad no meio da conversao, o CRC
+falha e devolve DEVICE_DISCONNECTED_C (-127). As chamadas de diagnostico que eu
+acrescentei (getResolution) fizeram a lib descobrir a resolucao real de passagem,
+e o tempo de espera passou a ser o correto.
+
+O fio VDD tambem estava solto de fato — eram duas falhas somadas, e so a segunda
+explicava o -127 persistente.
+
+CORRECAO NO FIRMWARE: sensoresIniciar() passa a chamar setResolution(12)
+explicitamente. Sem isso a temperatura sairia null no no_sensor v0.
+
+LED de status: confirmado aceso pelo operador durante a varredura de saidas.
+Jumper roxo 33j -> linha 53; LED da linha 53 ao terra via resistor 330R.

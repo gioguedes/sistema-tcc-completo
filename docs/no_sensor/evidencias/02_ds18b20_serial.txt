@@ -1,0 +1,66 @@
+Evidência — Task 2: validação do DS18B20 (1-Wire, GPIO25)
+Data: 2026-07-02
+Placa: ESP32-D0WD-V3 (DevKitC 38 pinos), MAC a4:f0:0f:64:3c:70
+Montagem: sonda à prova d'água, pull-up 4,7 kΩ entre dados (GPIO25) e 3V3, protoboard.
+
+--- 1) Detecção de falha (sem pull-up montado) ---
+ERRO: sensor nao respondeu
+ERRO: sensor nao respondeu
+(o sketch acusa corretamente a ausência de resposta do barramento 1-Wire)
+
+--- 2) Leitura ambiente (após montagem do pull-up) ---
+Temperatura: 17.44 C
+Temperatura: 17.44 C
+Temperatura: 17.50 C
+Temperatura: 17.56 C
+Temperatura: 17.62 C
+Temperatura: 17.69 C
+Temperatura: 17.75 C
+Temperatura: 17.81 C
+Temperatura: 17.88 C
+Temperatura: 17.94 C
+Temperatura: 18.00 C
+Temperatura: 18.06 C
+Temperatura: 18.12 C
+Temperatura: 18.19 C
+Temperatura: 18.25 C
+Temperatura: 18.31 C
+Temperatura: 18.38 C
+(valor plausível para ambiente em julho; degraus de 0,06 °C = resolução de 12 bits)
+
+--- 3) Prova de responsividade (ponta metálica segurada na mão) ---
+Temperatura: 24.19 C
+Temperatura: 24.25 C
+Temperatura: 24.31 C
+Temperatura: 24.50 C
+Temperatura: 24.81 C
+Temperatura: 25.12 C
+Temperatura: 25.44 C
+Temperatura: 25.75 C
+Temperatura: 26.06 C
+Temperatura: 26.38 C
+Temperatura: 26.62 C
+Temperatura: 26.88 C
+Temperatura: 27.12 C
+Temperatura: 27.44 C
+Temperatura: 27.62 C
+Temperatura: 27.81 C
+Temperatura: 28.06 C
+Temperatura: 28.25 C
+Temperatura: 28.44 C
+Temperatura: 28.56 C
+Temperatura: 28.75 C
+Temperatura: 28.94 C
+Temperatura: 29.06 C
+Temperatura: 29.25 C
+Temperatura: 29.31 C
+Temperatura: 29.50 C
+Temperatura: 29.62 C
+Temperatura: 29.75 C
+Temperatura: 29.88 C
+Temperatura: 30.00 C
+Temperatura: 30.06 C
+Temperatura: 30.12 C
+(subida contínua de ~24 °C para ~30 °C em contato com a mão)
+
+Resultado: PASSOU — sensor detecta falha, lê ambiente plausível e responde a estímulo térmico.

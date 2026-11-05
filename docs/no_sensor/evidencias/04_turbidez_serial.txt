@@ -1,0 +1,47 @@
+Evidência — Task 4: validação do sensor de turbidez (GPIO34) — PARCIAL
+Data: 2026-07-02
+Montagem: driver do sensor a 5 V, divisor 4,7 kΩ + 4,7 kΩ (fator 2,0) no GPIO34,
+média de 32 amostras. Valores abaixo já corrigidos pelo fator (tensão real do sensor).
+
+--- 1) Sensor no ar (seco) ---
+Tensao real do sensor: 2597 mV
+Tensao real do sensor: 2600 mV
+Tensao real do sensor: 2598 mV
+Tensao real do sensor: 2599 mV
+(estável, flutuação ±5 mV — baseline do ar ≈ 2598 mV)
+
+--- 2) Primeiro contato com água limpa ---
+Tensao real do sensor: 2655 mV
+Tensao real do sensor: 2658 mV
+(primeiras leituras coerentes: água limpa ≈ ar, levemente acima)
+
+--- 3) Degradação progressiva na água (~30 s depois) ---
+Tensao real do sensor: 3203 mV
+Tensao real do sensor: 2105 mV
+Tensao real do sensor: 1320 mV
+Tensao real do sensor:  882 mV
+Tensao real do sensor:  418 mV
+Tensao real do sensor:  284 mV
+(colapso caótico até um piso cravado em 284 mV, mesmo imobilizado com fita e sem bolhas)
+
+--- 4) Fora da água ---
+Tensao real do sensor: 2681 mV
+Tensao real do sensor: 2450 mV
+Tensao real do sensor: 2323 mV
+Tensao real do sensor: 2310 mV
+Tensao real do sensor: 2324 mV
+(recuperação lenta e contínua rumo ao baseline — comportamento de umidade interna secando)
+
+DIAGNÓSTICO: infiltração de água na carcaça do sensor (emenda superior/entrada do cabo
+sem vedação — defeito comum em unidades genéricas). A óptica funciona: baseline do ar
+estável e primeiras leituras na água corretas.
+
+PRÓXIMOS PASSOS:
+1. Secagem completa (24 h) e confirmação do baseline ~2600 mV no ar;
+2. Vedação da emenda superior e entrada do cabo com cola quente/silicone
+   (sem cobrir as janelas ópticas);
+3. Reteste com imersão parcial (2–3 cm);
+4. Plano B: unidade reserva encomendada junto com os jumpers.
+
+Resultado: PENDENTE — sensor funcional no ar; reteste após vedação.
+TURB_MV_0NTU e TURB_MV_100NTU ainda não medidos.

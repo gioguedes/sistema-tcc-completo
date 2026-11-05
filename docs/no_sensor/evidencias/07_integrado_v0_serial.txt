@@ -1,0 +1,53 @@
+Evidência — Task 7 Step 7: firmware integrado v0 na placa
+Data: 2026-08-17
+Placa: ESP32 DevKitC 38 pinos, COM3. Serial a 115200.
+Intervalo reduzido a 10 s (fase de bancada; entrega usa 60 s).
+
+--- Boot ---
+no_sensor v0 - leitura integrada sem rede
+AVISO: pH usa constantes de fabrica (nao calibrado). O valor de pH
+       serve para conferir a resposta do sensor, nao como medida.
+Intervalo de leitura: 10000 ms
+
+--- Leituras (os tres sensores simultaneos) ---
+Leitura: ph=4.48 temp=27.5 turb=10.7
+Leitura: ph=4.47 temp=27.6 turb=11.9
+Leitura: ph=4.48 temp=27.6 turb=10.3
+Leitura: ph=4.48 temp=27.6 turb=11.3
+
+COERENCIA DOS VALORES
+- pH 4,48: eletrodo na garrafinha (solucao de armazenamento acida). Constantes
+  de fabrica, nao calibrado — serve como resposta, nao como medida.
+- 27,6 C: bate com os 27,5 C lidos pelo diagnostico_bancada minutos antes.
+- ~11 NTU com o sensor no ar: correto pela curva atual. TURB_MV_0NTU esta em
+  2656 mV (agua limpa) e o ar da 2588 mV, o que resulta em 10,5 NTU. Nao e
+  ruido; e a consequencia de a referencia de 0 NTU ser agua limpa.
+- Nenhum bip duplo: nenhum sensor retornou NAN nesta rodada.
+
+PENDENTE NESTA TASK
+- Teste de interferencia cruzada (mexer em um sensor por vez).
+- Confirmacao visual do OLED e do LED piscando lento.
+
+--- LED de status: pendencia aberta (17/08) ---
+O LED nao acende com o firmware v0, e as medidas descartam o firmware:
+
+  autoteste: escrevi 1 li 1 / escrevi 0 li 0 (3x, antes e depois dos sensores)
+  pisca lento: calculado alterna 0/1 e o pino acompanha
+  continuidade: pull-up=0 pull-down=0 (existe caminho de baixa resistencia
+                ate o terra, mas o teste NAO distingue "LED + resistor" de
+                "resistor sozinho")
+  LED aceso fixo por 4 s: operador nao viu acender
+
+Topologia relatada pelo operador (NAO fecha com a medida):
+  jumper roxo 33j -> 53i
+  LED com as duas pernas na linha 53 (53j e 53g)  <- se fosse so isso, o GPIO13
+                                                     estaria flutuando e leria 1
+  resistor do LED entre 51h e 52h                 <- nao toca a linha 53
+
+Conclusao: alguma perna esta em linha diferente da anotada. Proximo passo quando
+houver acesso visual calmo a protoboard: remontar o LED com as pernas em LINHAS
+VIZINHAS (uma no no do GPIO13, outra no lado do resistor que vai ao terra) e
+conferir com uiChecarLed() + uiLedFixoPorSegundos(), que ficaram no display_ui.h.
+
+Nao bloqueia nada: o LED e indicador cosmetico e nao entra em nenhum criterio
+de aceite da spec.

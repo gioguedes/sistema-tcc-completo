@@ -1,0 +1,66 @@
+Evidência — Task 8: topologia de rede da bancada (bloqueio encontrado)
+Data: 2026-08-23
+
+Objetivo: publicar as leituras no broker Mosquitto do PC (192.168.2.2:1883).
+Resultado: BLOQUEADO por topologia de rede. O firmware está correto; o PC é que
+não é alcançável a partir de nenhuma rede Wi-Fi da casa.
+
+--- 1. Firmware v1 na placa (MAC a4:f0:0f:64:3c:70) ---
+Serial:
+  Rede: SSID "[rede Wi-Fi]", broker 192.168.2.2:1883
+  Topico: piscicultura/a4f00f643c70/leituras
+  Rede: Wi-Fi OK ip=192.168.15.15 rssi=-23 dBm
+  Rede: relogio sincronizado (epoch=1787526878)
+  Rede: MQTT nao conectou (erro=-3 rc=0), proxima em 10000 ms
+  FALHA ao publicar: {"mac":"a4f00f643c70","ts":1787526881,"ph":5.566083,...}
+
+Wi-Fi e NTP: OK. erro=-3 = LWMQTT_NETWORK_FAILED_CONNECT (TCP não abriu).
+O nó recebeu 192.168.15.15; o PC está em 192.168.2.2 — sub-redes diferentes.
+
+--- 2. O que foi descartado ---
+- Broker: escutando em 0.0.0.0:1883 (não só loopback) e testado da própria LAN;
+  o log do broker prova QoS 1 ("Received PUBLISH ... q1" + "Sending PUBACK").
+- Firewall do Windows: DESABILITADO nos três perfis (Domain/Private/Public).
+- Antivírus/firewall de terceiros: nenhum (só Windows Defender).
+- Chegada dos pacotes: zero linhas com 192.168.15.x no log do broker — o SYN do
+  nó nunca chega ao PC.
+
+--- 3. Topologia real ---
+  tracert do PC (192.168.2.2) para o nó (192.168.15.15):
+    1   <1 ms  192.168.2.1
+    2  6-18 ms 192.168.15.15
+  MAC do gateway 192.168.2.1: c6:84:fc:30:5e:64 (locally administered)
+  Portas 80/443/8080 do gateway: fechadas (sem interface web)
+
+  Internet ─ roteador principal (192.168.15.1, Wi-Fi "[rede Wi-Fi]"/"[rede Wi-Fi]")
+                    │
+                    └── (link Wi-Fi) aparelho 192.168.2.1 ──cabo── PC 192.168.2.2
+                                        NAT próprio
+
+  O PC está atrás de um NAT em cascata. Saída do PC para a rede 15: funciona
+  (o PC pinga o nó). Entrada da rede 15 para o PC: impossível sem port forward.
+
+--- 4. Redes Wi-Fi testadas, todas com IP obtido pelo nó ---
+  "[rede Wi-Fi]" bssid [oculto] (-38 dBm) -> ip 192.168.15.15  TCP 1883 FALHOU
+  "[rede Wi-Fi]" bssid [oculto] (-61 dBm) -> ip 192.168.15.15  TCP 1883 FALHOU
+  "[rede Wi-Fi]"      bssid [oculto] (-59 dBm) -> ip 192.168.15.15  TCP 1883 FALHOU
+
+  O AP EA:D3:... tem MAC locally administered (extensor), mas opera em bridge:
+  entrega IP do DHCP do roteador principal, não cria sub-rede.
+  Conclusão: NENHUMA rede Wi-Fi da casa está na sub-rede 192.168.2.x.
+
+--- 5. Diagnóstico de senha (por que "[rede Wi-Fi]" recusou primeiro) ---
+  Primeira tentativa com a senha da "[rede Wi-Fi]": 7x reason=15
+  (4WAY_HANDSHAKE_TIMEOUT) = AP no alcance, senha errada. Com a senha correta
+  da "[rede Wi-Fi]", conectou — e caiu na mesma rede 192.168.15.x.
+
+--- 6. Saídas possíveis (decisão pendente) ---
+  a) Mover o cabo do PC para o roteador principal -> PC ganha IP 192.168.15.x,
+     mesma rede do nó. Só exige atualizar MQTT_BROKER_IP. Definitivo.
+  b) Configurar o aparelho 192.168.2.1 em modo bridge/AP (depende do modelo).
+  c) Port forward 1883 no aparelho 192.168.2.1 (sem interface web; provável app).
+  d) Adaptador USB Wi-Fi no PC e ligá-lo na "[rede Wi-Fi]".
+
+Impacto no TC2: o backend do sub-projeto 2 (paho-mqtt -> TimescaleDB) roda no
+mesmo PC, então essa barreira precisa cair de qualquer forma — não é específica
+do firmware.

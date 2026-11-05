@@ -1,0 +1,34 @@
+﻿ets Jul 29 2019 12:21:46
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+configsip: 0, SPIWP:0xee
+clk_drv:0x00,q_drv:0x00,d_drv:0x00,cs0_drv:0x00,hd_drv:0x00,wp_drv:0x00
+mode:DIO, clock div:1
+load:0x3fff0030,len:4876
+ho 0 tail 12 room 4
+load:0x40078000,len:16560
+load:0x40080400,len:3500
+entry 0x400805b4
+  continuidade do LED: pull-up=1 pull-down=0 -> CIRCUITO ABERTO (LED ou resistor fora do furo)
+
+no_sensor v2 - leitura integrada + MQTT QoS 1 + buffer offline
+AVISO: pH usa constantes de fabrica (nao calibrado). O valor de pH
+       serve para conferir a resposta do sensor, nao como medida.
+Intervalo de leitura: 10000 ms | buffer: 120 leituras
+Comandos no Serial: queda | buffer
+Rede: SSID "[rede Wi-Fi]", broker broker.hivemq.com:1883
+Topico: tcc-piscicultura-morgado/a4f00f643c70/leituras
+Rede: Wi-Fi OK ip=192.168.15.11 rssi=-62 dBm
+Rede: relogio sincronizado (epoch=1787622077)
+Leitura na fila (buffer=1): ph=5.23 temp=22.1 turb=19.0
+Rede: MQTT conectado (online)
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787622077,"ph":5.23,"temperatura":22.13,"turbidez":18.95}
+Leitura na fila (buffer=1): ph=5.20 temp=21.6 turb=18.5
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787622087,"ph":5.2,"temperatura":21.56,"turbidez":18.45}
+Leitura na fila (buffer=1): ph=5.21 temp=21.6 turb=19.3
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787622097,"ph":5.21,"temperatura":21.56,"turbidez":19.32}
+Leitura na fila (buffer=1): ph=5.22 temp=21.5 turb=19.6
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787622107,"ph":5.22,"temperatura":21.5,"turbidez":19.57}
+Leitura na fila (buffer=1): ph=5.26 temp=21.6 turb=20.2
+Publicado (0 na fila): {"mac":"a4f00f643c70","ts":1787622117,"ph":5.26,"temperatura":21.56,"turbidez":20.25}
+

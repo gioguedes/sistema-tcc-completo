@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monitor do no sensor - TCC piscicultura</title>
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1419; --painel: #1a2028; --borda: #2a3441;
+    --texto: #e6edf3; --fraco: #8b949e;
+    --ph: #a78bfa; --temp: #fb923c; --turb: #38bdf8;
+    --ok: #3fb950; --erro: #f85149; --alerta: #d29922;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px; background: var(--bg); color: var(--texto);
+    font-family: "Segoe UI", system-ui, sans-serif;
+  }
+  header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 4px; }
+  h1 { font-size: 20px; margin: 0; font-weight: 600; }
+  .sub { color: var(--fraco); font-size: 13px; }
+  #status {
+    display: inline-flex; align-items: center; gap: 8px; padding: 4px 12px;
+    border-radius: 999px; font-size: 13px; border: 1px solid var(--borda);
+  }
+  #bolinha { width: 9px; height: 9px; border-radius: 50%; background: var(--alerta); }
+  #bolinha.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  #bolinha.off { background: var(--erro); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 20px 0; }
+  .card { background: var(--painel); border: 1px solid var(--borda); border-radius: 12px; padding: 16px 18px; }
+  .card h2 { margin: 0 0 6px; font-size: 13px; font-weight: 600; color: var(--fraco); text-transform: uppercase; letter-spacing: .06em; }
+  .valor { font-size: 42px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .valor .un { font-size: 18px; font-weight: 500; color: var(--fraco); margin-left: 4px; }
+  .valor.nulo { color: var(--erro); font-size: 28px; }
+  .faixa { font-size: 12px; color: var(--fraco); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  canvas { width: 100%; height: 70px; margin-top: 10px; display: block; }
+  .ph .valor { color: var(--ph); } .temp .valor { color: var(--temp); } .turb .valor { color: var(--turb); }
+
+  .aviso { background: #2a2418; border: 1px solid #6b5620; color: #e3c07b; border-radius: 8px;
+           padding: 10px 14px; font-size: 13px; margin-bottom: 16px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--borda); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--fraco); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  td.nulo { color: var(--erro); }
+  .painel { background: var(--painel); border: 1px solid var(--borda); border-radius: 12px; padding: 6px 16px 12px; }
+  .rodape { color: var(--fraco); font-size: 12px; margin-top: 16px; line-height: 1.6; }
+  code { background: #11161c; padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Nó sensor — tanque de piscicultura</h1>
+  <span id="status"><span id="bolinha"></span><span id="statusTexto">conectando…</span></span>
+</header>
+<div class="sub">
+  MAC <code>a4f00f643c70</code> · tópico <code>tcc-piscicultura-morgado/a4f00f643c70/leituras</code> ·
+  publica a cada 60 s
+</div>
+
+<div class="cards">
+  <div class="card ph">
+    <h2>pH</h2>
+    <div class="valor" id="vPh">—</div>
+    <div class="faixa" id="fPh">aguardando primeira leitura</div>
+    <canvas id="gPh"></canvas>
+  </div>
+  <div class="card temp">
+    <h2>Temperatura</h2>
+    <div class="valor" id="vTemp">—</div>
+    <div class="faixa" id="fTemp">aguardando primeira leitura</div>
+    <canvas id="gTemp"></canvas>
+  </div>
+  <div class="card turb">
+    <h2>Turbidez</h2>
+    <div class="valor" id="vTurb">—</div>
+    <div class="faixa" id="fTurb">aguardando primeira leitura</div>
+    <canvas id="gTurb"></canvas>
+  </div>
+</div>
+
+<div class="aviso">
+  <strong>pH não calibrado.</strong> O firmware roda com as constantes de fábrica
+  (<code>PH_CALIBRADO 0</code>) porque as soluções tampão 4,01 / 6,86 ainda não foram
+  compradas. O valor serve para conferir a resposta do sensor, não como medida.
+  A turbidez é grandeza de tendência: a curva tem dois pontos e o segundo é estimado.
+</div>
+
+<div class="painel">
+  <table>
+    <thead>
+      <tr><th>Recebida em</th><th>ts (epoch)</th><th>pH</th><th>Temp. °C</th><th>Turbidez NTU</th></tr>
+    </thead>
+    <tbody id="tabela">
+      <tr><td colspan="5" style="text-align:center;color:var(--fraco);padding:24px">
+        sem mensagens ainda — a próxima leitura sai em até 60 s
+      </td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="rodape">
+  Conecta em <code>wss://broker.hivemq.com:8884/mqtt</code>, o mesmo broker público que o nó
+  usa enquanto a rede local não permite o Mosquitto do PC.
+  <strong>O tópico é público:</strong> qualquer pessoa que saiba o nome dele pode ler estas
+  leituras — não colocar nada sensível no payload.
+</div>
+
+<script>
+const TOPICO = "tcc-piscicultura-morgado/a4f00f643c70/leituras";
+const MAX_PONTOS = 60;   // 1 h de histórico a 60 s por leitura
+const MAX_LINHAS = 15;
+
+const serie = { ph: [], temperatura: [], turbidez: [] };
+const cor   = { ph: "#a78bfa", temperatura: "#fb923c", turbidez: "#38bdf8" };
+const canvasDe = { ph: "gPh", temperatura: "gTemp", turbidez: "gTurb" };
+const valorDe  = { ph: "vPh", temperatura: "vTemp", turbidez: "vTurb" };
+const faixaDe  = { ph: "fPh", temperatura: "fTemp", turbidez: "fTurb" };
+const unidade  = { ph: "", temperatura: "°C", turbidez: "NTU" };
+const casas    = { ph: 2, temperatura: 1, turbidez: 1 };
+
+function setStatus(texto, classe) {
+  document.getElementById("statusTexto").textContent = texto;
+  document.getElementById("bolinha").className = classe || "";
+}
+
+// Desenha a série como sparkline. Escala pelo próprio min/max, com folga de 10%,
+// porque as três grandezas têm ordens de magnitude diferentes.
+function desenhar(chave) {
+  const cv = document.getElementById(canvasDe[chave]);
+  const dpr = window.devicePixelRatio || 1;
+  const larg = cv.clientWidth, alt = cv.clientHeight;
+  cv.width = larg * dpr; cv.height = alt * dpr;
+  const ctx = cv.getContext("2d");
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, larg, alt);
+
+  const pts = serie[chave].filter(v => v !== null);
+  if (pts.length < 2) return;
+
+  let min = Math.min(...pts), max = Math.max(...pts);
+  if (max - min < 1e-6) { min -= 0.5; max += 0.5; }
+  const folga = (max - min) * 0.1;
+  min -= folga; max += folga;
+
+  const x = i => (i / (serie[chave].length - 1)) * larg;
+  const y = v => alt - ((v - min) / (max - min)) * alt;
+
+  // área sob a curva
+  ctx.beginPath();
+  let comecou = false;
+  serie[chave].forEach((v, i) => {
+    if (v === null) return;
+    if (!comecou) { ctx.moveTo(x(i), y(v)); comecou = true; }
+    else ctx.lineTo(x(i), y(v));
+  });
+  const grad = ctx.createLinearGradient(0, 0, 0, alt);
+  grad.addColorStop(0, cor[chave] + "55");
+  grad.addColorStop(1, cor[chave] + "00");
+  ctx.lineTo(larg, alt); ctx.lineTo(0, alt); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  // linha
+  ctx.beginPath(); comecou = false;
+  serie[chave].forEach((v, i) => {
+    if (v === null) return;
+    if (!comecou) { ctx.moveTo(x(i), y(v)); comecou = true; }
+    else ctx.lineTo(x(i), y(v));
+  });
+  ctx.strokeStyle = cor[chave]; ctx.lineWidth = 2;
+  ctx.lineJoin = "round"; ctx.stroke();
+
+  // ponto atual
+  const ultimoIdx = serie[chave].length - 1;
+  const ultimo = serie[chave][ultimoIdx];
+  if (ultimo !== null) {
+    ctx.beginPath();
+    ctx.arc(x(ultimoIdx), y(ultimo), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = cor[chave]; ctx.fill();
+  }
+}
+
+function atualizarCard(chave) {
+  const vals = serie[chave];
+  const atual = vals[vals.length - 1];
+  const el = document.getElementById(valorDe[chave]);
+  if (atual === null || atual === undefined) {
+    el.className = "valor nulo";
+    el.textContent = "SENSOR EM FALHA";
+  } else {
+    el.className = "valor";
+    el.innerHTML = atual.toFixed(casas[chave]) +
+      (unidade[chave] ? '<span class="un">' + unidade[chave] + "</span>" : "");
+  }
+  const validos = vals.filter(v => v !== null);
+  const f = document.getElementById(faixaDe[chave]);
+  if (validos.length >= 2) {
+    const min = Math.min(...validos), max = Math.max(...validos);
+    f.textContent = `min ${min.toFixed(casas[chave])} · máx ${max.toFixed(casas[chave])} · ${validos.length} leituras`;
+  } else {
+    f.textContent = `${validos.length} leitura(s)`;
+  }
+  desenhar(chave);
+}
+
+function celula(v, c) {
+  if (v === null || v === undefined) return '<td class="nulo">null</td>';
+  return "<td>" + v.toFixed(c) + "</td>";
+}
+
+function novaLinha(dados) {
+  const tb = document.getElementById("tabela");
+  if (tb.querySelector("td[colspan]")) tb.innerHTML = "";
+  const hora = new Date().toLocaleTimeString("pt-BR");
+  const tr = document.createElement("tr");
+  tr.innerHTML = "<td>" + hora + "</td><td>" + dados.ts + "</td>" +
+                 celula(dados.ph, 2) + celula(dados.temperatura, 2) + celula(dados.turbidez, 2);
+  tb.prepend(tr);
+  while (tb.children.length > MAX_LINHAS) tb.removeChild(tb.lastChild);
+}
+
+const cliente = mqtt.connect("wss://broker.hivemq.com:8884/mqtt", {
+  clientId: "monitor-tcc-" + Math.random().toString(16).slice(2, 10),
+  reconnectPeriod: 4000
+});
+
+cliente.on("connect", () => {
+  setStatus("conectado ao broker", "on");
+  cliente.subscribe(TOPICO, { qos: 1 }, err => {
+    if (err) setStatus("erro ao assinar o tópico", "off");
+    else setStatus("ouvindo o nó · aguardando leitura", "on");
+  });
+});
+cliente.on("reconnect", () => setStatus("reconectando…", ""));
+cliente.on("offline",   () => setStatus("offline", "off"));
+cliente.on("error",     e  => setStatus("erro: " + e.message, "off"));
+
+cliente.on("message", (topico, payload) => {
+  let d;
+  try { d = JSON.parse(payload.toString()); }
+  catch (e) { console.warn("payload invalido:", payload.toString()); return; }
+
+  ["ph", "temperatura", "turbidez"].forEach(k => {
+    const v = (d[k] === null || d[k] === undefined) ? null : Number(d[k]);
+    serie[k].push(v);
+    if (serie[k].length > MAX_PONTOS) serie[k].shift();
+    atualizarCard(k);
+  });
+  novaLinha(d);
+  setStatus("última leitura às " + new Date().toLocaleTimeString("pt-BR"), "on");
+});
+
+window.addEventListener("resize", () => {
+  ["ph", "temperatura", "turbidez"].forEach(desenhar);
+});
+</script>
+</body>
+</html>

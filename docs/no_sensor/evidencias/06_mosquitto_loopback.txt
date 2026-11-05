@@ -1,0 +1,21 @@
+Evidência — Task 6: broker Mosquitto de teste no PC
+Data: 2026-07-02
+Instalação: winget (EclipseFoundation.Mosquitto 2.1.2) em C:\Program Files\mosquitto
+
+--- Broker subindo com ferramentas/mosquitto_teste.conf ---
+mosquitto version 2.1.2 starting
+Config loaded from C:\Users\rafael\Desktop\TCC\sistema\ferramentas\mosquitto_teste.conf.
+Opening ipv4 listen socket on port 1883.
+mosquitto version 2.1.2 running
+
+--- Teste de loopback ---
+Comando: mosquitto_pub -h localhost -t "piscicultura/teste" -m "ola do PC" -q 1
+Recebido pelo assinante (mosquitto_sub -h localhost -t "piscicultura/#" -v):
+piscicultura/teste ola do PC
+
+--- Rede ---
+IPv4 do PC (Ethernet): 192.168.2.2  -> sera o MQTT_BROKER_IP do config.h
+Regra de firewall (TCP 1883, perfil Private): criada com sucesso em PowerShell admin
+("Mosquitto 1883 (TCC)", Enabled: True, PrimaryStatus: OK).
+
+Resultado: PASSOU — broker operacional na porta 1883 e liberado no firewall para a rede local.

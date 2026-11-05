@@ -1,0 +1,29 @@
+Task 5 — validação do sensor de pH SEN0161-V2 (GPIO35) — MODO TENSÃO
+Data: 2026-07-09
+
+Trecho do Serial (teste_ph.ino, 115200 baud), eletrodo dentro da garrafinha
+de proteção (solução de armazenamento, ácida ~pH 4):
+
+Tensao: 1916 mV  ->  pH 4.63
+Tensao: 1915 mV  ->  pH 4.64
+Tensao: 1914 mV  ->  pH 4.64
+Tensao: 1912 mV  ->  pH 4.65
+Tensao: 1925 mV  ->  pH 4.58
+Tensao: 1917 mV  ->  pH 4.62
+Tensao: 1926 mV  ->  pH 4.58
+Tensao: 1931 mV  ->  pH 4.55
+Tensao: 1921 mV  ->  pH 4.60
+Tensao: 1930 mV  ->  pH 4.56
+
+Leitura estável (~1920 mV ± 15 mV), coerente com solução de armazenamento
+ácida. O valor de pH exibido usa constantes provisórias — NÃO é válido até
+a calibração de 2 pontos.
+
+Registro de bancada: a primeira tentativa leu ~300 mV instável (260–330 mV).
+Causa: conector BNC do eletrodo não estava travado na placa Gravity. Após
+encaixar e girar até travar, a leitura foi para a faixa esperada.
+
+Pendências desta task (aguardando soluções tampão pH 4,01 e 6,86 — os sachês
+NÃO vieram na caixa do sensor):
+- Teste de resposta (água da torneira: esperado ~1400–1600 mV);
+- Calibração de 2 pontos e registro em docs/calibracao_ph.md.
