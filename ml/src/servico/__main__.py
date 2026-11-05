@@ -21,6 +21,7 @@ def executar_ciclo(
     confianca_min: float,
     agora: datetime | None = None,
     aerador: ControleAerador | None = None,
+    recentes_min: int = 0,
 ) -> dict[str, int]:
     agora = agora or datetime.now(timezone.utc)
     contagem = {"gravados": 0, "indeterminados": 0, "erros": 0, "aerador": 0}
@@ -31,7 +32,7 @@ def executar_ciclo(
     for id_tanque, faixa in tanques:
         try:
             with engine.begin() as conn:
-                previsoes = inferencia.prever(ler_janela(conn, id_tanque, agora), faixa, agora)
+                previsoes = inferencia.prever(ler_janela(conn, id_tanque, agora, recentes_min), faixa, agora)
                 if previsoes is None:
                     logger.info("tanque %d: dados insuficientes, previsao indeterminada", id_tanque)
                     contagem["indeterminados"] += 1
@@ -87,10 +88,14 @@ def main(argv: list[str] | None = None) -> None:
     engine = create_engine(settings.database_url)
     aerador = _controle_aerador(settings)
     logger.info("servico de ML iniciado, ciclo a cada %d s", settings.ml_intervalo_s)
+    if settings.ml_demo_minutos > 0:
+        logger.info("modo demonstracao: bloco atual com os ultimos %d min", settings.ml_demo_minutos)
 
     while True:
         try:
-            logger.info("ciclo: %s", executar_ciclo(engine, inferencia, settings.ml_confianca_min, aerador=aerador))
+            logger.info("ciclo: %s", executar_ciclo(
+                engine, inferencia, settings.ml_confianca_min, aerador=aerador, recentes_min=settings.ml_demo_minutos
+            ))
         except Exception:
             # banco fora do ar, por exemplo: tenta de novo no próximo ciclo
             logger.exception("ciclo falhou")

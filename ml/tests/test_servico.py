@@ -182,3 +182,21 @@ def test_pacote_com_variaveis_diferentes_nao_inicia(pacote):
 def test_pacote_de_outra_versao_nao_inicia(pacote):
     with pytest.raises(ValueError, match="versão 1"):
         Inferencia({**pacote, "versao": 1}, cobertura_min_blocos=3)
+
+
+def test_modo_demo_reage_a_troca_de_copo_sem_esperar_o_bloco_fechar(db, pacote):
+    agora = datetime(2026, 9, 24, 12, 10, 30, tzinfo=timezone.utc)
+    with db.begin() as conn:
+        # 88 min em pH 7,5 e os 2 últimos em 4,0: no bloco 12:00, a mediana ainda é 7,5
+        _com_leituras(conn, minutos=90, ph=[7.5] * 88 + [4.0] * 2, termina_em=agora)
+    inferencia = Inferencia(pacote, cobertura_min_blocos=3)
+
+    def od_estimado(recentes_min: int) -> float:
+        executar_ciclo(db, inferencia, confianca_min=0.5, agora=agora, recentes_min=recentes_min)
+        with db.begin() as conn:
+            valor = conn.execute(text("SELECT valor_previsto FROM previsoes WHERE horizonte_h = 0")).scalar_one()
+            conn.execute(text("DELETE FROM previsoes"))
+        return float(valor)
+
+    sem_demo, com_demo = od_estimado(0), od_estimado(2)
+    assert com_demo != pytest.approx(sem_demo)

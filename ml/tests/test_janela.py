@@ -72,3 +72,39 @@ def test_tanques_ativos_traz_a_faixa_e_pula_inativos(db):
         tanques = tanques_ativos(conn)
     assert len(tanques) == 1
     assert tanques[0][1] == TILAPIA
+
+
+def _troca_de_copo(conn) -> dict:
+    """pH 7,0 de 11:55:30 a 12:07:30 e 9,2 de 12:08:30 em diante (o sensor mudou de copo)."""
+    ids = semear_tanque(conn)
+    inicio = datetime(2026, 9, 24, 11, 55, 30, tzinfo=timezone.utc)
+    inserir_leituras(conn, ids["sensores"]["ph"], inicio, [7.0] * 13 + [9.2] * 3)
+    inserir_leituras(conn, ids["sensores"]["temperatura"], inicio, [26.0] * 16)
+    return ids
+
+
+def test_sem_modo_demo_o_bloco_atual_e_a_mediana_do_bloco(db):
+    with db.begin() as conn:
+        ids = _troca_de_copo(conn)
+        janela = ler_janela(conn, ids["id_tanque"], datetime(2026, 9, 24, 12, 10, 30, tzinfo=timezone.utc))
+    assert janela["ph"].iloc[-1] == pytest.approx(7.0)
+
+
+def test_modo_demo_usa_so_os_ultimos_minutos_no_bloco_atual(db):
+    with db.begin() as conn:
+        ids = _troca_de_copo(conn)
+        janela = ler_janela(
+            conn, ids["id_tanque"], datetime(2026, 9, 24, 12, 10, 30, tzinfo=timezone.utc), recentes_min=2
+        )
+    assert janela["ph"].iloc[-1] == pytest.approx(9.2)
+    # os blocos fechados não mudam
+    assert janela.loc[pd.Timestamp("2026-09-24 11:45", tz="UTC"), "ph"] == pytest.approx(7.0)
+
+
+def test_modo_demo_sem_leitura_recente_mantem_a_mediana_do_bloco(db):
+    with db.begin() as conn:
+        ids = _troca_de_copo(conn)
+        janela = ler_janela(
+            conn, ids["id_tanque"], datetime(2026, 9, 24, 12, 14, 0, tzinfo=timezone.utc), recentes_min=2
+        )
+    assert janela["ph"].iloc[-1] == pytest.approx(7.0)

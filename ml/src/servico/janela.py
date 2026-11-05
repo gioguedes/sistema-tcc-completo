@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 from sqlalchemy import Connection, text
@@ -42,8 +42,12 @@ def tanques_ativos(conn: Connection) -> list[tuple[int, FaixaEspecie]]:
     ]
 
 
-def ler_janela(conn: Connection, id_tanque: int, agora: datetime) -> pd.DataFrame:
-    """Últimos 90 min de pH e temperatura em 6 blocos de 15 min; o último é o bloco de `agora` (pode estar parcial)."""
+def ler_janela(conn: Connection, id_tanque: int, agora: datetime, recentes_min: int = 0) -> pd.DataFrame:
+    """Últimos 90 min de pH e temperatura em 6 blocos de 15 min; o último é o bloco de `agora` (pode estar parcial).
+
+    Com `recentes_min` > 0 (modo demonstração), o bloco de `agora` usa só a mediana dos últimos
+    `recentes_min` minutos, para a previsão acompanhar uma troca de copo sem esperar o bloco fechar.
+    """
     grade = pd.date_range(end=pd.Timestamp(agora).floor(BLOCO), periods=BLOCOS_JANELA, freq=BLOCO)
     linhas = conn.execute(SQL_LEITURAS, {"id_tanque": id_tanque, "desde": grade[0], "ate": agora}).all()
     if not linhas:
@@ -57,4 +61,9 @@ def ler_janela(conn: Connection, id_tanque: int, agora: datetime) -> pd.DataFram
         .reindex(columns=GRANDEZAS_ENTRADA)
         .reset_index()
     )
-    return para_grade_15min(largo, GRANDEZAS_ENTRADA).reindex(grade)
+    janela = para_grade_15min(largo, GRANDEZAS_ENTRADA).reindex(grade)
+    if recentes_min > 0:
+        recentes = bruto[bruto["ts"] > pd.Timestamp(agora) - timedelta(minutes=recentes_min)]
+        for grandeza, valores in recentes.groupby("grandeza")["valor"]:
+            janela.loc[grade[-1], grandeza] = valores.median()
+    return janela

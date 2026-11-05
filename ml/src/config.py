@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     ml_intervalo_s: int = 300
     ml_confianca_min: float = 0.5
     ml_cobertura_min_blocos: int = 3
+    # modo demonstração: o bloco corrente usa só os últimos N minutos (0 = desligado)
+    ml_demo_minutos: int = 0
     # altitude do tanque: o OD de saturação cai com a pressão (cerca de 9% a menos a 760 m)
     ml_altitude_m: float = 0.0
 
