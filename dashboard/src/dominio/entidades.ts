@@ -157,6 +157,11 @@ export const previsaoAtual = z.object({
   horizontes: z.array(previsao),
 })
 
+export const configAlertas = z.object({
+  webhook_url: z.string().nullable(),
+  atualizado_em: dataHora.nullable(),
+})
+
 export const alerta = z.object({
   id,
   id_tanque: id,

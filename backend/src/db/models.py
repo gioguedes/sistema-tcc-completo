@@ -11,6 +11,7 @@ from sqlalchemy import (
     Numeric,
     SmallInteger,
     String,
+    Text,
     UniqueConstraint,
     text,
 )
@@ -197,5 +198,15 @@ class AcionamentoAtuador(Base):
     acao: Mapped[str] = mapped_column(String(10))
     motivo: Mapped[str | None] = mapped_column(String(160))
     ts_acionamento: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+
+
+class Configuracao(Base):
+    __tablename__ = "configuracoes"
+
+    chave: Mapped[str] = mapped_column(String(80), primary_key=True)
+    valor: Mapped[str] = mapped_column(Text)
+    atualizado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=text("now()")
     )

@@ -104,9 +104,26 @@ export const esquemaConta = z.object({
     .refine((v) => v === '' || normalizarTelefone(v) !== null, 'Informe DDD e número, como (11) 98765-4321.'),
 })
 
+const ehUrlDeWebhook = (valor: string) => {
+  try {
+    return ['http:', 'https:'].includes(new URL(valor).protocol)
+  } catch {
+    return false
+  }
+}
+
+export const esquemaConfigAlertas = z.object({
+  webhook_url: z
+    .string()
+    .trim()
+    .max(500, 'Use no máximo 500 caracteres.')
+    .refine((v) => v === '' || ehUrlDeWebhook(v), 'Informe uma URL completa, começando com http:// ou https://.'),
+})
+
 export type ValoresLogin = z.infer<typeof esquemaLogin>
 export type ValoresTanque = z.infer<typeof esquemaTanque>
 export type ValoresCadastroTanque = z.infer<typeof esquemaCadastroTanque>
 export type EntradaDispositivo = z.input<typeof esquemaDispositivo>
 export type ValoresDispositivo = z.output<typeof esquemaDispositivo>
 export type ValoresConta = z.infer<typeof esquemaConta>
+export type ValoresConfigAlertas = z.infer<typeof esquemaConfigAlertas>

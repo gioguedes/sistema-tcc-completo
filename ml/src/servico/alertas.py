@@ -9,6 +9,7 @@ import json
 import logging
 import time
 import urllib.request
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 
@@ -159,6 +160,7 @@ class Webhook:
             return False
 
 
+SQL_WEBHOOK = text("SELECT valor FROM configuracoes WHERE chave = 'alertas_webhook_url'")
 SQL_LEITURAS = text(
     """
     SELECT grandeza, ts, valor FROM (
@@ -198,8 +200,8 @@ SQL_ATUALIZAR = text("UPDATE alertas SET status = :status, ts_envio = :ts WHERE 
 class MonitorAlertas:
     """Dispara só quando o caso muda. O primeiro caso depois de iniciar também sai: serve de sinal de que está no ar."""
 
-    def __init__(self, destino: Destino, confianca_min: float) -> None:
-        self._destino = destino
+    def __init__(self, fabrica_destino: Callable[[str], Destino], confianca_min: float) -> None:
+        self._fabrica_destino = fabrica_destino
         self._confianca_min = confianca_min
         self._enviado: dict[int, str] = {}
         self._pendente: dict[int, tuple[str, int]] = {}
@@ -208,10 +210,15 @@ class MonitorAlertas:
         agora = agora or datetime.now(timezone.utc)
         contagem = {"enviados": 0, "falhas": 0}
         with engine.connect() as conn:
+            url = conn.execute(SQL_WEBHOOK).scalar_one_or_none()
             tanques = tanques_ativos(conn)
+        # sem webhook não avalia nada: ao configurar, o primeiro caso sai como se o serviço tivesse acabado de subir
+        if not url:
+            return contagem
+        destino = self._fabrica_destino(url)
         for id_tanque, faixa in tanques:
             try:
-                enviado = self._avaliar(engine, id_tanque, faixa, agora)
+                enviado = self._avaliar(engine, destino, id_tanque, faixa, agora)
             except Exception:
                 # um tanque com problema não pode impedir o alerta dos outros
                 logger.exception("tanque %d: erro ao avaliar alerta", id_tanque)
@@ -223,7 +230,9 @@ class MonitorAlertas:
                 contagem["falhas"] += 1
         return contagem
 
-    def _avaliar(self, engine: Engine, id_tanque: int, faixa: FaixaEspecie, agora: datetime) -> bool | None:
+    def _avaliar(
+        self, engine: Engine, destino: Destino, id_tanque: int, faixa: FaixaEspecie, agora: datetime
+    ) -> bool | None:
         with engine.connect() as conn:
             leituras, ts_leitura = self._ler_leituras(conn, id_tanque, agora)
             previsoes = conn.execute(
@@ -258,7 +267,7 @@ class MonitorAlertas:
             caso, id_alerta, id_tanque, tanque.nome, tanque.telefone, valores,
             float(od.confianca) if od else None, risco, faixa, ts_leitura, agora,
         )
-        ok = self._destino.enviar(alerta)
+        ok = destino.enviar(alerta)
         with engine.begin() as conn:
             conn.execute(SQL_ATUALIZAR, {"status": "enviado" if ok else "falha", "ts": agora if ok else None, "id": id_alerta})
         if ok:
@@ -293,7 +302,7 @@ EXEMPLOS = {
 
 
 def alerta_simulado(caso: str, faixa: FaixaEspecie, agora: datetime) -> dict:
-    """Payload de exemplo para montar o workflow sem mexer no sensor; não passa pelo banco."""
+    """Payload de exemplo para montar o workflow sem mexer no sensor; não grava em `alertas`."""
     alerta = montar_alerta(
         caso, 0, 1, "Tanque bancada TCC", None, EXEMPLOS[caso], 0.8,
         {"1h": "otimo", "2h": "otimo", "3h": "otimo"}, faixa, agora, agora,
@@ -304,22 +313,25 @@ def alerta_simulado(caso: str, faixa: FaixaEspecie, agora: datetime) -> dict:
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Dispara alertas de qualidade da água para o webhook do N8N")
-    parser.add_argument("--simular", choices=CASOS, help="envia só um exemplo deste caso, sem usar o banco, e sai")
+    parser.add_argument("--simular", choices=CASOS, help="envia só um exemplo deste caso, sem gravar alerta, e sai")
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     settings = Settings()
-    if not settings.alertas_webhook_url:
-        raise SystemExit("defina ALERTAS_WEBHOOK_URL no ml/.env")
-    webhook = Webhook(settings.alertas_webhook_url, settings.alertas_webhook_token)
+    engine = create_engine(settings.database_url)
 
     if args.simular:
-        ok = webhook.enviar(alerta_simulado(args.simular, TILAPIA, datetime.now(timezone.utc)))
+        with engine.connect() as conn:
+            url = conn.execute(SQL_WEBHOOK).scalar_one_or_none()
+        if not url:
+            raise SystemExit("configure a URL do webhook no painel, em Configurações")
+        ok = Webhook(url, settings.alertas_webhook_token).enviar(
+            alerta_simulado(args.simular, TILAPIA, datetime.now(timezone.utc))
+        )
         print(f"exemplo '{args.simular}': {'enviado' if ok else 'NAO enviado'}")
         raise SystemExit(0 if ok else 1)
 
-    engine = create_engine(settings.database_url)
-    monitor = MonitorAlertas(webhook, settings.ml_confianca_min)
+    monitor = MonitorAlertas(lambda url: Webhook(url, settings.alertas_webhook_token), settings.ml_confianca_min)
     logger.info("servico de alertas iniciado, ciclo a cada %d s", settings.alertas_intervalo_s)
     while True:
         try:

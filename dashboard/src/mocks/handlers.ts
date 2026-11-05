@@ -324,6 +324,8 @@ const dadosDoTanque = (c: Corpo) => ({
 
 // ---------------------------------------------------------------- rotas
 
+let webhookSimulado: string | null = null
+
 export const handlers = [
   http.post(`${API}/auth/login`, async ({ request }) => {
     await delay()
@@ -371,6 +373,24 @@ export const handlers = [
     usuario.telefone = telefone
     salvarBanco()
     return HttpResponse.json(semSenha(usuario))
+  }),
+
+  http.get(`${API}/configuracoes/alertas`, async ({ request }) => {
+    await delay()
+    const usuario = autorizar(request, true)
+    if (usuario instanceof Response) return usuario
+    return HttpResponse.json({ webhook_url: webhookSimulado, atualizado_em: webhookSimulado ? iso(Date.now()) : null })
+  }),
+
+  http.put(`${API}/configuracoes/alertas`, async ({ request }) => {
+    await delay()
+    const usuario = autorizar(request, true)
+    if (usuario instanceof Response) return usuario
+    const url = String((await lerCorpo(request)).webhook_url ?? '').trim()
+    if (url && !/^https?:\/\/[^\s/]+/.test(url))
+      return erroDeCampos(422, [[['webhook_url'], 'Informe uma URL completa, começando com http:// ou https://.']])
+    webhookSimulado = url || null
+    return HttpResponse.json({ webhook_url: webhookSimulado, atualizado_em: webhookSimulado ? iso(Date.now()) : null })
   }),
 
   http.get(`${API}/especies`, async ({ request }) => {

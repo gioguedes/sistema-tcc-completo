@@ -2,6 +2,7 @@ import type { FiltroAlertas } from '@/infra/api/recursos'
 
 /** Chaves de cache padronizadas: permitem invalidar só o que mudou. */
 export const chaves = {
+  configAlertas: ['configuracoes', 'alertas'] as const,
   especies: ['especies'] as const,
   tanques: ['tanques'] as const,
   tanque: (id: number) => ['tanques', id] as const,

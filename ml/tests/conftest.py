@@ -59,7 +59,7 @@ def db(engine):
         conn.execute(
             text(
                 "TRUNCATE previsoes, leituras, sensores, tipos_sensor, dispositivos, "
-                "tanques, especies, usuarios RESTART IDENTITY CASCADE"
+                "tanques, especies, usuarios, configuracoes RESTART IDENTITY CASCADE"
             )
         )
 

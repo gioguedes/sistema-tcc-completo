@@ -3,7 +3,7 @@ import { ErroApi, erroDeResposta } from './erros'
 import { sessao } from './sessao'
 import { montarUrl, TEMPO_LIMITE_MS, type Parametros } from './url'
 
-type Metodo = 'GET' | 'POST' | 'PATCH' | 'DELETE'
+type Metodo = 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE'
 
 export interface OpcoesRequisicao {
   metodo?: Metodo

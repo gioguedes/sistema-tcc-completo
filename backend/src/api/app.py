@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from src.api.comando_aerador import PublicadorMqtt
 from src.api.config import ConfigApi
-from src.api.rotas import aerador, alertas, autenticacao, cadastro, catalogos, tanques
+from src.api.rotas import aerador, alertas, autenticacao, cadastro, catalogos, configuracoes, tanques
 from src.config import Settings
 from src.db.session import criar_engine, criar_session_factory
 
@@ -44,6 +44,6 @@ def criar_app(
     app.state.config = config
     app.state.fabrica_sessao = fabrica_sessao
     app.state.publicador = publicador
-    for modulo in (autenticacao, catalogos, tanques, cadastro, aerador, alertas):
+    for modulo in (autenticacao, catalogos, tanques, cadastro, aerador, alertas, configuracoes):
         app.include_router(modulo.router, prefix=PREFIXO)
     return app

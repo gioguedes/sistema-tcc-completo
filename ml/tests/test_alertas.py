@@ -12,6 +12,7 @@ from tests.banco import inserir_leituras, semear_tanque
 
 INICIO = datetime(2026, 11, 23, 19, 0, 0, tzinfo=timezone.utc)
 CONFIANCA_MIN = 0.5
+URL_PADRAO = "https://n8n.exemplo.test/webhook/abc"
 
 
 class DestinoFalso:
@@ -33,10 +34,25 @@ class Cenario:
 
     def __init__(self, db, destino: DestinoFalso) -> None:
         self.db = db
-        self.monitor = MonitorAlertas(destino, CONFIANCA_MIN)
+        self.urls: list[str] = []
+        self.monitor = MonitorAlertas(self._destino_de, CONFIANCA_MIN)
+        self._destino = destino
         with db.begin() as conn:
             self.ids = semear_tanque(conn)
+        self.configurar(URL_PADRAO)
         self.agora = INICIO
+
+    def _destino_de(self, url: str) -> DestinoFalso:
+        self.urls.append(url)
+        return self._destino
+
+    def configurar(self, url: str | None) -> None:
+        with self.db.begin() as conn:
+            conn.execute(text("DELETE FROM configuracoes"))
+            if url:
+                conn.execute(
+                    text("INSERT INTO configuracoes (chave, valor) VALUES ('alertas_webhook_url', :u)"), {"u": url}
+                )
 
     def leitura(self, ph: float, temperatura: float = 26.0) -> dict:
         with self.db.begin() as conn:
@@ -175,6 +191,41 @@ def test_no_parado_nao_dispara(cenario, destino):
     cenario.leitura(8.1)
     cenario.monitor.executar_ciclo(cenario.db, cenario.agora + timedelta(minutes=30))
     assert destino.casos == ["normal"]
+
+
+def test_sem_webhook_nao_dispara_nem_grava(cenario, destino):
+    cenario.configurar(None)
+    assert cenario.leitura(9.18) == {"enviados": 0, "falhas": 0}
+    assert destino.casos == []
+    assert cenario.linhas_alertas() == []
+
+
+def test_ao_configurar_no_painel_vale_no_ciclo_seguinte_e_sai_o_caso_atual(cenario, destino):
+    cenario.configurar(None)
+    cenario.leitura(9.18)
+    cenario.configurar(URL_PADRAO)
+    cenario.leitura(9.18)
+    assert destino.casos == ["ph_alto"]
+    assert cenario.urls == [URL_PADRAO]
+
+
+def test_trocar_a_url_vale_sem_reiniciar_e_nao_repete_o_alerta(cenario, destino):
+    cenario.leitura(9.18)
+    cenario.configurar("https://outro.test/webhook/x")
+    cenario.leitura(9.18)
+    assert destino.casos == ["ph_alto"]
+    cenario.leitura(4.2)
+    assert cenario.urls[-1] == "https://outro.test/webhook/x"
+    assert destino.casos == ["ph_alto", "ph_baixo"]
+
+
+def test_desligar_e_religar_nao_repete_o_mesmo_caso(cenario, destino):
+    cenario.leitura(9.18)
+    cenario.configurar(None)
+    cenario.leitura(9.18)
+    cenario.configurar(URL_PADRAO)
+    cenario.leitura(9.18)
+    assert destino.casos == ["ph_alto"]
 
 
 def test_payload_tem_o_que_o_workflow_precisa(cenario, destino):

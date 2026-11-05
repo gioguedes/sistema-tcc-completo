@@ -3,6 +3,7 @@ import type { Grandeza, StatusSensor, StatusTanque, StatusAlerta, AcaoAtuador } 
 import {
   acionamento,
   alertasPaginados,
+  configAlertas,
   dispositivo,
   especie,
   eventosPaginados,
@@ -30,6 +31,12 @@ export interface DadosDispositivo {
   versao_firmware: string | null
   ip_local: string | null
 }
+
+export const buscarConfigAlertas = (sinal?: AbortSignal) =>
+  requisitar('/configuracoes/alertas', configAlertas, { sinal })
+
+export const salvarConfigAlertas = (dados: { webhook_url: string | null }) =>
+  requisitar('/configuracoes/alertas', configAlertas, { metodo: 'PUT', corpo: dados })
 
 export const listarEspecies = (sinal?: AbortSignal) => requisitar('/especies', z.array(especie), { sinal })
 

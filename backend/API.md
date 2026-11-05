@@ -51,6 +51,7 @@ Todas com prefixo `/api/v1`. Fora `/auth/login`, `/auth/refresh` e `/auth/logout
 | `GET /tanques/{id}/previsoes/atual` | último ciclo do ML: OD de agora (h = 0) e risco de 1 a 3 h |
 | `GET /alertas` | lista vazia até o sub-projeto 4 (N8N) existir |
 | `GET /eventos` | acionamentos do aerador, mais recentes primeiro (os alertas entram quando existirem) |
+| `GET` / `PUT /configuracoes/alertas` | **admin** · URL do webhook do N8N (`webhook_url`); vazia desliga os alertas. O serviço de alertas lê a cada ciclo |
 | `POST /tanques` | **admin** · cria o tanque e, se vier `dispositivo`, o nó com os 3 sensores, na mesma transação |
 | `PATCH /tanques/{id}` | **admin** · altera os dados do tanque; "excluir" é mudar `status` para `inativo` |
 | `POST /dispositivos` | **admin** · cria um nó em um tanque existente, com os 3 sensores |

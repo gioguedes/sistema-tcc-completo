@@ -4,17 +4,25 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation } from '@tanstack/react-query'
 import { Accessibility, LogOut, Save, X } from 'lucide-react'
 import { useTituloDocumento } from '@/compartilhado/hooks'
-import { esquemaConta, formatarTelefone, normalizarTelefone, type ValoresConta } from '@/dominio/formularios'
+import {
+  esquemaConfigAlertas,
+  esquemaConta,
+  formatarTelefone,
+  normalizarTelefone,
+  type ValoresConfigAlertas,
+  type ValoresConta,
+} from '@/dominio/formularios'
 import { ROTULO_PERFIL } from '@/dominio/rotulos'
 import { atualizarConta } from '@/infra/api/autenticacao'
 import type { Tema } from '@/infra/armazenamento/preferencias'
 import { Botao } from '@/ui/Botao'
 import { Alternador, CampoBusca, Campo } from '@/ui/Campos'
 import { CabecalhoCartao, Cartao } from '@/ui/Cartao'
-import { Aviso } from '@/ui/Estados'
+import { Aviso, Carregando, EstadoErro } from '@/ui/Estados'
 import { SeletorSegmentado } from '@/ui/Navegacao'
 import { useToast } from '@/ui/Toast'
 import { CartaoAplicativo } from '../../componentes/Aplicativo'
+import { useConfigAlertas, useSalvarConfigAlertas } from '../../consultas/configuracoes'
 import { aplicarErrosDaApi } from '../../componentes/formularios'
 import { usePreferencias } from '../../preferencias'
 import { aplicarTema, trocarTemaComTransicao } from '../../tema'
@@ -116,8 +124,72 @@ function FormularioConta() {
   )
 }
 
+function FormularioWebhook({ urlAtual }: { urlAtual: string | null }) {
+  const { mostrar } = useToast()
+  const [erroGeral, setErroGeral] = useState<string | null>(null)
+  const salvar = useSalvarConfigAlertas()
+  const {
+    register,
+    handleSubmit,
+    setError,
+    reset,
+    formState: { errors, isSubmitting, isDirty },
+  } = useForm<ValoresConfigAlertas>({
+    resolver: zodResolver(esquemaConfigAlertas),
+    defaultValues: { webhook_url: urlAtual ?? '' },
+  })
+
+  const enviar = handleSubmit(async (valores) => {
+    setErroGeral(null)
+    try {
+      const salvo = await salvar.mutateAsync({ webhook_url: valores.webhook_url || null })
+      reset({ webhook_url: salvo.webhook_url ?? '' })
+      mostrar('Webhook dos alertas salvo.')
+    } catch (erro) {
+      setErroGeral(aplicarErrosDaApi(erro, setError))
+    }
+  })
+
+  return (
+    <form noValidate onSubmit={enviar} className="space-y-4">
+      {erroGeral && (
+        <Aviso tom="critico" urgente>
+          {erroGeral}
+        </Aviso>
+      )}
+      <Aviso tom={urlAtual ? 'info' : 'atencao'}>
+        {urlAtual ? 'Alertas ligados: o sistema avisa este webhook.' : 'Alertas desligados: nenhum webhook configurado.'}
+      </Aviso>
+      <Campo
+        rotulo="URL do webhook"
+        type="url"
+        inputMode="url"
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="https://seu-n8n/webhook/..."
+        dica="Recebe um aviso sempre que o estado do tanque muda. Deixe em branco para desligar. Trate como senha: quem tem o link consegue disparar o workflow."
+        erro={errors.webhook_url?.message}
+        {...register('webhook_url')}
+      />
+      <div className="flex justify-end">
+        <Botao type="submit" icone={Save} carregando={isSubmitting} disabled={!isDirty}>
+          Salvar webhook
+        </Botao>
+      </div>
+    </form>
+  )
+}
+
+function ConfiguracaoAlertas() {
+  const consulta = useConfigAlertas()
+  if (consulta.isPending) return <Carregando />
+  if (consulta.isError) return <EstadoErro erro={consulta.error} aoTentarNovamente={() => void consulta.refetch()} />
+  return <FormularioWebhook urlAtual={consulta.data.webhook_url} />
+}
+
 export default function PaginaConfiguracoes() {
   useTituloDocumento('Configurações')
+  const usuario = useUsuario()
   const { sair } = useAutenticacao()
   const { modoAvancado, linguagemSimples, explicacaoOdDispensada, tema, altitudeM, alterar } = usePreferencias()
   const [busca, setBusca] = useState('')
@@ -146,6 +218,13 @@ export default function PaginaConfiguracoes() {
         <CabecalhoCartao id="titulo-conta" titulo="Minha conta" />
         <FormularioConta />
       </Cartao>
+
+      {usuario.perfil === 'admin' && (
+        <Cartao aria-labelledby="titulo-alertas">
+          <CabecalhoCartao id="titulo-alertas" titulo="Alertas por WhatsApp" />
+          <ConfiguracaoAlertas />
+        </Cartao>
+      )}
 
       <Cartao aria-labelledby="titulo-preferencias" className="space-y-5">
         <CabecalhoCartao id="titulo-preferencias" titulo="Preferências" className="mb-0" />

@@ -32,8 +32,7 @@ class Settings(BaseSettings):
     mqtt_broker_port: int = 1883
     mqtt_topic_prefix: str = ""
 
-    # alertas para o N8N (vazio = serviço de alertas não sobe)
-    alertas_webhook_url: str = ""
+    # a URL do webhook de alertas é configurada no painel (tabela configuracoes); o token é opcional
     alertas_webhook_token: str = ""
     alertas_intervalo_s: int = 15
 
