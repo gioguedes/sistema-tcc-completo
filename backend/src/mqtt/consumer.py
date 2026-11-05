@@ -18,6 +18,7 @@ class ConsumerMqtt:
         topico_prefixo: str,
         session_factory: sessionmaker[Session],
         processor: LeituraProcessor,
+        client_id: str = "",
     ) -> None:
         self._broker_host = broker_host
         self._broker_port = broker_port
@@ -28,7 +29,8 @@ class ConsumerMqtt:
         # sessão persistente: com client_id fixo e clean_session=False, o broker guarda as leituras
         # QoS 1 que chegarem enquanto a ingestão estiver fora e entrega quando ela voltar
         self._client = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2, client_id=f"ingestao-{topico_prefixo}", clean_session=False
+            mqtt.CallbackAPIVersion.VERSION2, client_id=client_id or f"ingestao-{topico_prefixo}",
+            clean_session=False,
         )
         self._client.on_connect = self._ao_conectar
         self._client.on_message = self._ao_receber_mensagem

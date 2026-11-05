@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     mqtt_broker_host: str
     mqtt_broker_port: int
     mqtt_topic_prefix: str
+    # vazio = ingestao-<prefixo>; outra máquina no mesmo broker precisa de um id próprio
+    mqtt_client_id: str = ""
 
     db_host: str
     db_port: int

@@ -21,6 +21,7 @@ def main() -> None:
         topico_prefixo=settings.mqtt_topic_prefix,
         session_factory=session_factory,
         processor=processor,
+        client_id=settings.mqtt_client_id,
     )
 
     logger.info("iniciando consumo do broker %s:%s", settings.mqtt_broker_host, settings.mqtt_broker_port)

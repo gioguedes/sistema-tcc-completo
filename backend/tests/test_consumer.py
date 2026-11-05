@@ -92,3 +92,15 @@ def test_sessao_mqtt_persistente_com_client_id_fixo():
     consumer = _consumer(MagicMock())
     assert consumer._client._client_id == b"ingestao-tcc-piscicultura-morgado"
     assert consumer._client._clean_session is False
+
+
+def test_client_id_configuravel_para_rodar_duas_ingestoes_no_mesmo_broker():
+    consumer = ConsumerMqtt(
+        broker_host="localhost",
+        broker_port=1884,
+        topico_prefixo="tcc-piscicultura-morgado",
+        session_factory=MagicMock(),
+        processor=MagicMock(),
+        client_id="ingestao-notebook",
+    )
+    assert consumer._client._client_id == b"ingestao-notebook"
