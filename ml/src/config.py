@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     mqtt_broker_port: int = 1883
     mqtt_topic_prefix: str = ""
 
+    # alertas para o N8N (vazio = serviço de alertas não sobe)
+    alertas_webhook_url: str = ""
+    alertas_webhook_token: str = ""
+    alertas_intervalo_s: int = 15
+
     @property
     def database_url(self) -> str:
         return (
