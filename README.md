@@ -60,9 +60,9 @@ Sem o nó físico, `backend/scripts/simular_leituras.py` publica leituras no mes
 ## Testes
 
 ```bash
-cd backend && .venv/Scripts/python -m pytest      # 111 testes (precisam do banco e do mosquitto-test)
-cd ml && .venv/Scripts/python -m pytest           # 128 testes (criam o banco piscicultura_ml_test)
-cd dashboard && npm test                          # 41 testes
+cd backend && .venv/Scripts/python -m pytest      # 129 testes (precisam do banco e do mosquitto-test)
+cd ml && .venv/Scripts/python -m pytest           # 165 testes (criam o banco piscicultura_ml_test)
+cd dashboard && npm test                          # 46 testes
 ```
 
 ## Machine Learning em resumo
@@ -80,11 +80,16 @@ cd dashboard && npm test                          # 41 testes
   - Risco: acurácia de 97,3%, 96,6% e 95,7% em 1, 2 e 3 h no teste final, com recall de
     crítico acima da persistência.
   - A previsão só agrega à persistência nas mudanças de nível; o relatório mostra as duas lado a lado.
+- **Medidas complementares** (`cd ml && python -m analises.medidas_complementares`, sem retreinar;
+  saída em `ml/relatorios/medidas_complementares.json`): linhas de base físicas do OD, episódios de
+  OD baixo, a confiança do intervalo de quantis e a previsão de risco como aviso antecipado. O
+  limiar de baixa confiança (`ML_CONFIANCA_MIN`, 0,33) sai daí.
 
 ## Limitações conhecidas
 
 - O broker MQTT é público e sem autenticação. A ingestão descarta leituras cujo MAC do payload
-  não bate com o do tópico, mas isso não substitui autenticação.
+  não bate com o do tópico e leituras datadas mais de 10 minutos à frente do relógio do
+  computador, mas isso não substitui autenticação.
 - O OD é estimado por um modelo treinado em lagos dos EUA. No tanque, ele é uma indicação e
   precisa de medições de referência.
 - O nó ainda não confirma o estado do relé do aerador; o painel mostra o último comando enviado.
