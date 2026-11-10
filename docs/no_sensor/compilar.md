@@ -16,6 +16,34 @@ $env:ARDUINO_DIRECTORIES_USER = "$env:USERPROFILE\Documents\Arduino"
 - Trocar o último argumento pelo caminho de qualquer sketch, inclusive os de
   `firmware/testes/`.
 
+## arduino-cli avulso, sem o Arduino IDE (notebook, 09/11/2026)
+
+No notebook o `arduino-cli` 1.5.1 foi instalado sozinho, em
+`%LOCALAPPDATA%\Programs\arduino-cli`, com o núcleo `esp32:esp32@3.3.10` (cerca de 7,7 GB em
+`%LOCALAPPDATA%\Arduino15`) e as bibliotecas ArduinoJson 7.4.3, OneWire 2.3.8,
+DallasTemperature 4.0.6, MQTT 2.5.3, Adafruit GFX Library 1.13.0, Adafruit BusIO 1.17.4 e
+Adafruit SSD1306 2.5.17. As bibliotecas ficam em `C:\tcc\arduino`, fora do OneDrive. Com
+`--build-path` os binários saem sempre na mesma pasta, o que dispensa procurar o `build-dir`
+na hora de gravar:
+
+```powershell
+$cli = "$env:LOCALAPPDATA\Programs\arduino-cli\arduino-cli.exe"
+$env:ARDUINO_DIRECTORIES_DATA = "$env:LOCALAPPDATA\Arduino15"
+$env:ARDUINO_DIRECTORIES_USER = "C:\tcc\arduino"
+& $cli compile --fqbn esp32:esp32:esp32 --warnings all --build-path C:\tcc\arduino\build\no_sensor firmware\no_sensor
+```
+
+Para refazer a instalação em outra máquina:
+
+```powershell
+$url = "https://espressif.github.io/arduino-esp32/package_esp32_index.json"
+& $cli core update-index --additional-urls $url
+& $cli core install esp32:esp32@3.3.10 --additional-urls $url
+& $cli lib install ArduinoJson OneWire DallasTemperature MQTT "Adafruit GFX Library" "Adafruit SSD1306"
+```
+
+Na gravação pelo esptool (mais abaixo), usar `$d = "C:\tcc\arduino\build\no_sensor"`.
+
 ## Gravar pela linha de comando (opcional)
 
 ```powershell
