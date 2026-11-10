@@ -1,7 +1,9 @@
 """Alertas de qualidade da água (RF06, UC04): avisa o N8N por webhook quando o estado do tanque muda.
 
-Roda fora do ciclo de ML, que no modo normal só passa a cada 5 min: o requisito é enviar o alerta
-em até 60 s depois de cruzar o limiar crítico. Por isso olha a última leitura, e não a mediana do bloco.
+Roda fora do ciclo de ML, que no modo normal só passa a cada 5 min, e olha as leituras, e não a mediana
+do bloco. A condição crítica de pH ou temperatura só vale com duas leituras seguidas do mesmo lado da
+faixa: o alerta sai depois da segunda, ou seja, um intervalo de leitura do nó mais um ciclo deste serviço
+depois da primeira leitura crítica.
 """
 
 import argparse
@@ -45,6 +47,13 @@ def _br(valor: float, casas: int = 2) -> str:
     return f"{valor:.{casas}f}".replace(".", ",")
 
 
+def _caso_da_leitura(valor: float, grandeza: str, faixa: FaixaEspecie) -> str | None:
+    if nivel(valor, grandeza, faixa) != CRITICO:
+        return None
+    baixo, alto = GRANDEZAS_MEDIDAS[grandeza]
+    return baixo if valor < faixa.limites(grandeza)[0] else alto
+
+
 def classificar(
     leituras: dict[str, list[float]],
     od: tuple[float, float] | None,
@@ -52,19 +61,25 @@ def classificar(
     confianca_min: float,
     anterior: str | None,
 ) -> str | None:
-    """Caso atual do tanque; None sem leitura recente. `leituras` vem da mais nova para a mais antiga; `od` é (valor, confiança)."""
+    """Caso atual do tanque; None enquanto não dá para dizer (sem leitura recente, ou só uma leitura crítica antes de qualquer envio).
+
+    `leituras` vem da mais nova para a mais antiga; `od` é (valor, confiança); `anterior` é o último caso enviado.
+    """
     if not any(leituras.get(g) for g in GRANDEZAS_MEDIDAS):
         return None
-    for grandeza, (baixo, alto) in GRANDEZAS_MEDIDAS.items():
-        valores = leituras.get(grandeza)
-        if valores and nivel(valores[0], grandeza, faixa) == CRITICO:
-            return baixo if valores[0] < faixa.limites(grandeza)[0] else alto
+    recentes = {g: [_caso_da_leitura(v, g, faixa) for v in leituras.get(g, [])[:2]] for g in GRANDEZAS_MEDIDAS}
+    for casos in recentes.values():
+        if len(casos) == 2 and casos[0] is not None and casos[0] == casos[1]:
+            return casos[0]
+    # o OD já vem da mediana de um bloco de leituras: não precisa de segunda confirmação
     if od is not None and od[1] >= confianca_min and nivel(od[0], "od", faixa) == CRITICO:
         return "od_baixo"
-    # uma leitura só de volta à faixa não encerra: um sensor oscilando na borda daria um alerta por minuto
-    grandeza = GRANDEZA_DO_CASO.get(anterior)
-    valores = leituras.get(grandeza) if grandeza in GRANDEZAS_MEDIDAS else None
-    if valores and len(valores) >= 2 and nivel(valores[1], grandeza, faixa) == CRITICO:
+    # uma leitura crítica isolada não abre o alerta: com o pH perto do limite, o ruído do eletrodo cruza a
+    # borda sozinho. Fica o caso anterior até a leitura seguinte confirmar ou desmentir
+    if any(casos and casos[0] is not None for casos in recentes.values()):
+        return anterior
+    # uma leitura só de volta à faixa também não encerra: um sensor oscilando na borda daria um alerta por minuto
+    if any(recentes.get(GRANDEZA_DO_CASO.get(anterior), [])):
         return anterior
     return "normal"
 

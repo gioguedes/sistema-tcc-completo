@@ -102,7 +102,24 @@ def cenario(db, destino):
     ],
 )
 def test_classifica_pelos_limites_da_especie(ph, temperatura, esperado):
-    assert classificar({"ph": [ph], "temperatura": [temperatura]}, None, TILAPIA, CONFIANCA_MIN, None) == esperado
+    leituras = {"ph": [ph, ph], "temperatura": [temperatura, temperatura]}
+    assert classificar(leituras, None, TILAPIA, CONFIANCA_MIN, None) == esperado
+
+
+@pytest.mark.parametrize("anterior", [None, "normal", "ph_alto", "temperatura_alta", "od_baixo"])
+def test_uma_leitura_critica_isolada_mantem_o_caso_anterior(anterior):
+    leituras = {"ph": [8.6, 8.1], "temperatura": [26.0, 26.0]}
+    assert classificar(leituras, None, TILAPIA, CONFIANCA_MIN, anterior) == anterior
+
+
+def test_leituras_criticas_de_lados_opostos_nao_confirmam():
+    leituras = {"ph": [4.2, 9.18], "temperatura": [26.0, 26.0]}
+    assert classificar(leituras, None, TILAPIA, CONFIANCA_MIN, "ph_alto") == "ph_alto"
+    assert classificar(leituras, None, TILAPIA, CONFIANCA_MIN, "normal") == "normal"
+
+
+def test_so_uma_leitura_critica_no_banco_ainda_nao_e_caso():
+    assert classificar({"ph": [9.18], "temperatura": [26.0]}, None, TILAPIA, CONFIANCA_MIN, None) is None
 
 
 def test_sem_leitura_recente_nao_ha_caso():
@@ -116,7 +133,13 @@ def test_od_critico_so_vale_com_confianca():
 
 
 def test_ph_medido_vem_antes_do_od_estimado():
-    assert classificar({"ph": [9.18], "temperatura": [26.0]}, (3.0, 0.8), TILAPIA, CONFIANCA_MIN, None) == "ph_alto"
+    leituras = {"ph": [9.18, 9.18], "temperatura": [26.0, 26.0]}
+    assert classificar(leituras, (3.0, 0.8), TILAPIA, CONFIANCA_MIN, None) == "ph_alto"
+
+
+def test_od_critico_nao_espera_a_confirmacao_do_ph():
+    leituras = {"ph": [9.18, 8.1], "temperatura": [26.0, 26.0]}
+    assert classificar(leituras, (3.0, 0.8), TILAPIA, CONFIANCA_MIN, "normal") == "od_baixo"
 
 
 def test_demonstracao_dos_tres_copos_dispara_uma_vez_por_mudanca(cenario, destino):
@@ -124,23 +147,40 @@ def test_demonstracao_dos_tres_copos_dispara_uma_vez_por_mudanca(cenario, destin
         cenario.leitura(ph)
     assert destino.casos == ["normal"]
 
-    for ph in (9.18, 9.18, 9.18):  # tampão
+    cenario.leitura(9.18)  # tampão: a primeira leitura ainda não dispara
+    assert destino.casos == ["normal"]
+    for ph in (9.18, 9.18):
         cenario.leitura(ph)
     assert destino.casos == ["normal", "ph_alto"]
 
-    for ph in (4.2, 4.2):  # vinagre, direto do tampão: muda na hora
-        cenario.leitura(ph)
+    cenario.leitura(4.2)  # vinagre, direto do tampão: também espera a segunda leitura
+    assert destino.casos == ["normal", "ph_alto"]
+    cenario.leitura(4.2)
     assert destino.casos == ["normal", "ph_alto", "ph_baixo"]
 
 
-def test_alerta_sai_na_primeira_leitura_critica(cenario, destino):
+def test_alerta_sai_na_segunda_leitura_critica_seguida(cenario, destino):
     cenario.leitura(8.1)
+    assert cenario.leitura(9.18) == {"enviados": 0, "falhas": 0}
     assert cenario.leitura(9.18) == {"enviados": 1, "falhas": 0}
-    assert destino.casos[-1] == "ph_alto"
+    assert destino.casos == ["normal", "ph_alto"]
+
+
+def test_leitura_critica_isolada_nao_dispara_nem_grava(cenario, destino):
+    for ph in (8.1, 8.6, 8.1, 8.1, 8.6, 8.4):
+        cenario.leitura(ph)
+    assert destino.casos == ["normal"]
+    assert len(cenario.linhas_alertas()) == 1
+
+
+def test_servico_que_sobe_com_a_agua_critica_nao_avisa_normal_antes(cenario, destino):
+    assert cenario.leitura(9.18) == {"enviados": 0, "falhas": 0}
+    cenario.leitura(9.18)
+    assert destino.casos == ["ph_alto"]
 
 
 def test_uma_leitura_de_volta_a_faixa_nao_encerra_o_critico(cenario, destino):
-    for ph in (9.18, 8.1):
+    for ph in (9.18, 9.18, 8.1):
         cenario.leitura(ph)
     assert destino.casos == ["ph_alto"]
     cenario.leitura(8.1)
@@ -148,12 +188,21 @@ def test_uma_leitura_de_volta_a_faixa_nao_encerra_o_critico(cenario, destino):
 
 
 def test_sensor_oscilando_na_borda_nao_gera_um_alerta_por_minuto(cenario, destino):
-    for ph in (8.6, 8.4, 8.6, 8.4, 8.6, 8.4):
+    for ph in (8.6, 8.6, 8.4, 8.6, 8.4, 8.6, 8.4):
         cenario.leitura(ph)
     assert destino.casos == ["ph_alto"]
 
 
+def test_temperatura_tambem_pede_duas_leituras(cenario, destino):
+    cenario.leitura(7.5, 26.0)
+    cenario.leitura(7.5, 30.5)
+    assert destino.casos == ["normal"]
+    cenario.leitura(7.5, 30.6)
+    assert destino.casos == ["normal", "temperatura_alta"]
+
+
 def test_grava_o_alerta_como_enviado_no_canal_whatsapp(cenario):
+    cenario.leitura(9.18)
     cenario.leitura(9.18)
     linha = cenario.linhas_alertas()[0]
     assert (linha.status, linha.canal) == ("enviado", "whatsapp")
@@ -163,6 +212,7 @@ def test_grava_o_alerta_como_enviado_no_canal_whatsapp(cenario):
 
 def test_falha_no_webhook_tenta_de_novo_na_mesma_linha(cenario, destino):
     destino.responde = False
+    cenario.leitura(9.18)
     assert cenario.leitura(9.18) == {"enviados": 0, "falhas": 1}
     linhas = cenario.linhas_alertas()
     assert [(l.status, l.ts_envio) for l in linhas] == [("falha", None)]
@@ -182,9 +232,12 @@ def test_falha_no_webhook_tenta_de_novo_na_mesma_linha(cenario, destino):
 def test_falha_seguida_de_outro_caso_registra_os_dois(cenario, destino):
     destino.responde = False
     cenario.leitura(9.18)
+    cenario.leitura(9.18)
     destino.responde = True
     cenario.leitura(4.2)
+    cenario.leitura(4.2)
     assert [l.status for l in cenario.linhas_alertas()] == ["falha", "enviado"]
+    assert destino.casos == ["ph_alto", "ph_baixo"]
 
 
 def test_no_parado_nao_dispara(cenario, destino):
@@ -211,9 +264,12 @@ def test_ao_configurar_no_painel_vale_no_ciclo_seguinte_e_sai_o_caso_atual(cenar
 
 def test_trocar_a_url_vale_sem_reiniciar_e_nao_repete_o_alerta(cenario, destino):
     cenario.leitura(9.18)
+    cenario.leitura(9.18)
+    assert destino.casos == ["ph_alto"]
     cenario.configurar("https://outro.test/webhook/x")
     cenario.leitura(9.18)
     assert destino.casos == ["ph_alto"]
+    cenario.leitura(4.2)
     cenario.leitura(4.2)
     assert cenario.urls[-1] == "https://outro.test/webhook/x"
     assert destino.casos == ["ph_alto", "ph_baixo"]
@@ -221,6 +277,8 @@ def test_trocar_a_url_vale_sem_reiniciar_e_nao_repete_o_alerta(cenario, destino)
 
 def test_desligar_e_religar_nao_repete_o_mesmo_caso(cenario, destino):
     cenario.leitura(9.18)
+    cenario.leitura(9.18)
+    assert destino.casos == ["ph_alto"]
     cenario.configurar(None)
     cenario.leitura(9.18)
     cenario.configurar(URL_PADRAO)
@@ -230,6 +288,7 @@ def test_desligar_e_religar_nao_repete_o_mesmo_caso(cenario, destino):
 
 def test_payload_tem_o_que_o_workflow_precisa(cenario, destino):
     cenario.previsao_od(6.5, 0.8)
+    cenario.leitura(9.18)
     cenario.leitura(9.18)
     alerta = destino.recebidos[0]
     assert alerta["evento"] == "alerta_qualidade_agua"
@@ -263,7 +322,7 @@ def test_exemplo_simulado_de_cada_caso(caso):
     assert alerta["id_alerta"] == 0
     # o exemplo precisa bater com a classificação real, senão o workflow é montado em cima de um caso impossível
     assert classificar(
-        {"ph": [alerta["ph"]], "temperatura": [alerta["temperatura"]]},
+        {"ph": [alerta["ph"]] * 2, "temperatura": [alerta["temperatura"]] * 2},
         (alerta["od_estimado"], alerta["od_confianca"]),
         TILAPIA,
         CONFIANCA_MIN,
