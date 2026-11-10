@@ -189,8 +189,8 @@ export const PREVISOES: Record<number, { confiancaOd: string; horizontes: Horizo
     ],
   },
   3: {
-    // abaixo de ML_CONFIANCA_MIN (0,5): estimativa de baixa confiança (UC06, fluxo alternativo)
-    confiancaOd: '0.4600',
+    // abaixo de ML_CONFIANCA_MIN (0,33): estimativa de baixa confiança (UC06, fluxo alternativo)
+    confiancaOd: '0.2100',
     horizontes: [
       { parametro: 'od', valor: '2.60', nivel: 'critico', probabilidade: '0.9400' },
       { parametro: 'od', valor: '2.40', nivel: 'critico', probabilidade: '0.9100' },

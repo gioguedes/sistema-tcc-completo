@@ -95,7 +95,7 @@ Todas com prefixo `/api/v1`. Fora `/auth/login`, `/auth/refresh` e `/auth/logout
 
 ### Leitura
 
-- **OD:** vem da linha `h = 0` de `previsoes` (`estimado: true`). `baixa_confianca` é `confianca < ML_CONFIANCA_MIN` (0,5), como no serviço de ML.
+- **OD:** vem da linha `h = 0` de `previsoes` (`estimado: true`). `baixa_confianca` é `confianca < ML_CONFIANCA_MIN` (0,33), como no serviço de ML.
 - **Previsão válida:** o último ciclo do ML tem no máximo 15 min (3 ciclos) e o tanque está `ativo`, com espécie. Fora disso, `previsoes/atual` volta sem nível, sem OD e sem horizontes. O `gerada_em` continua preenchido quando a previsão só está velha, para o painel mostrar "desatualizada desde…".
 - **Nível atual do tanque:** o pior entre pH e temperatura da última leitura (regra de `ml/src/faixas.py`, copiada em `src/api/faixas.py`) e o nível do OD que o ML gravou. Não há outra classificação na API. *A confirmar com a equipe.*
 - **Dispositivo online:** última leitura há no máximo 5 min (a ingestão não atualiza `status_conexao` nem `ultimo_heartbeat`).

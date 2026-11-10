@@ -18,4 +18,4 @@ class ConfigApi(BaseSettings):
     api_cookie_seguro: bool = True
 
     # mesmo limiar do servico de ML (ML_CONFIANCA_MIN no .env do ml/)
-    ml_confianca_min: float = 0.5
+    ml_confianca_min: float = 0.33

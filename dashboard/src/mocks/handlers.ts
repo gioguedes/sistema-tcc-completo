@@ -176,7 +176,7 @@ function estadoDoTanque(t: TanqueSimulado, agora: number) {
   if (comPrevisao && especie && fonte && previsao) {
     const od = valor('od', ciclo)
     const confianca = Number(previsao.confiancaOd)
-    odAtual = { valor: od, nivel: nivelPorFaixa(od, 'od', especie), confianca, baixa: confianca < 0.5, ts: ciclo }
+    odAtual = { valor: od, nivel: nivelPorFaixa(od, 'od', especie), confianca, baixa: confianca < 0.33, ts: ciclo }
     nivelAtual = nivelGeral(valor('ph', fonte.fim), valor('temperatura', fonte.fim), od, especie)
   }
   return { especie, fonte, cenario, comPrevisao, previsao, odAtual, nivelAtual, valor }

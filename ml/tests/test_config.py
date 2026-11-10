@@ -23,7 +23,7 @@ def test_padroes_do_servico_batem_com_a_spec(monkeypatch):
     _env_minimo(monkeypatch)
     settings = Settings(_env_file=None)
     assert settings.ml_intervalo_s == 300
-    assert settings.ml_confianca_min == 0.5
+    assert settings.ml_confianca_min == 0.33
     assert settings.ml_cobertura_min_blocos == 3
     assert settings.ml_demo_minutos == 0
     assert settings.caminho_modelos == Path("modelos") / "modelos.joblib"

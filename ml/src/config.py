@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     ml_modelos_dir: Path = Path("modelos")
     ml_relatorios_dir: Path = Path("relatorios")
     ml_intervalo_s: int = 300
-    ml_confianca_min: float = 0.5
+    # quartil inferior da confiança do OD em corpos d'água não vistos (analises/medidas_complementares.py).
+    # Com 0,5 a maior parte das estimativas dentro do domínio ficava marcada como baixa confiança
+    ml_confianca_min: float = 0.33
     ml_cobertura_min_blocos: int = 3
     # modo demonstração: o bloco corrente usa só os últimos N minutos (0 = desligado)
     ml_demo_minutos: int = 0

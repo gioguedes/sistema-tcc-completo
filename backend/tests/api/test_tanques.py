@@ -29,7 +29,7 @@ def test_ultima_leitura_por_grandeza_e_od_estimado_do_ml(autenticado, db_session
     gravar_leituras(db_session, tanque, t - 10 * MINUTO, ph=7.0, temperatura=25.0, turbidez=30.0)
     # sensor de turbidez em falha: o no publica null e a ingestao nao grava
     gravar_leituras(db_session, tanque, t - MINUTO, ph=7.2, temperatura=26.0)
-    gravar_ciclo(db_session, tanque, t - 2 * MINUTO, od=5.6, nivel_od="otimo", confianca_od=0.46)
+    gravar_ciclo(db_session, tanque, t - 2 * MINUTO, od=5.6, nivel_od="otimo", confianca_od=0.21)
     db_session.commit()
 
     corpo = _tanque(autenticado, tanque)
