@@ -1,5 +1,6 @@
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 
 import paho.mqtt.client as mqtt
 from sqlalchemy.orm import Session, sessionmaker
@@ -8,6 +9,10 @@ from src.mqtt.processor import LeituraProcessor
 from src.mqtt.schemas import LeituraMqttPayload
 
 logger = logging.getLogger(__name__)
+
+# o nó só publica com o relógio sincronizado por NTP. Uma leitura datada do futuro passaria a ser a
+# "última leitura" do tanque até essa data chegar, e o nó ficaria online no painel sem publicar
+TOLERANCIA_FUTURO = timedelta(minutes=10)
 
 
 class ConsumerMqtt:
@@ -52,6 +57,13 @@ class ConsumerMqtt:
         mac_topico = msg.topic.split("/")[-2] if msg.topic.count("/") >= 2 else ""
         if mac_topico.lower() != payload.mac.replace(":", "").lower():
             logger.warning("mac do payload (%s) nao bate com o do topico %s, descartando", payload.mac, msg.topic)
+            return
+
+        if payload.ts_utc > datetime.now(timezone.utc) + TOLERANCIA_FUTURO:
+            logger.warning(
+                "ts %s no futuro no topico %s, descartando (se for o no real, confira o relogio deste computador)",
+                payload.ts_utc.isoformat(), msg.topic,
+            )
             return
 
         try:

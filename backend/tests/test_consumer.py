@@ -1,4 +1,5 @@
 import logging
+import time
 from unittest.mock import MagicMock
 
 from src.mqtt.consumer import ConsumerMqtt
@@ -81,6 +82,31 @@ def test_mac_com_separador_e_maiusculas_no_payload_e_aceito():
     processor = MagicMock()
     consumer = _consumer(processor)
     payload_json = b'{"mac": "A4:F0:0F:64:3C:70", "ts": 1758499200, "ph": 6.8}'
+    mensagem = _MensagemFake("tcc-piscicultura-morgado/a4f00f643c70/leituras", payload_json)
+
+    consumer._ao_receber_mensagem(None, None, mensagem)
+
+    processor.processar_payload.assert_called_once()
+
+
+def test_leitura_datada_do_futuro_e_descartada(caplog):
+    processor = MagicMock()
+    consumer = _consumer(processor)
+    ts_2099 = 4070908800
+    payload_json = b'{"mac": "a4f00f643c70", "ts": %d, "ph": 6.8}' % ts_2099
+    mensagem = _MensagemFake("tcc-piscicultura-morgado/a4f00f643c70/leituras", payload_json)
+
+    with caplog.at_level(logging.WARNING):
+        consumer._ao_receber_mensagem(None, None, mensagem)
+
+    processor.processar_payload.assert_not_called()
+    assert "no futuro" in caplog.text
+
+
+def test_relogio_do_no_poucos_minutos_adiantado_e_aceito():
+    processor = MagicMock()
+    consumer = _consumer(processor)
+    payload_json = b'{"mac": "a4f00f643c70", "ts": %d, "ph": 6.8}' % (int(time.time()) + 120)
     mensagem = _MensagemFake("tcc-piscicultura-morgado/a4f00f643c70/leituras", payload_json)
 
     consumer._ao_receber_mensagem(None, None, mensagem)
