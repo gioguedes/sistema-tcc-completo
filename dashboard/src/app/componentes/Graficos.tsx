@@ -44,11 +44,11 @@ export function resumirSerie(serie: SerieLeituras | undefined): ResumoSerie | nu
   }
 }
 
-function Legenda({ tracejada, faixa }: { tracejada?: boolean; faixa?: boolean }) {
+function Legenda({ estimado, tracejada, faixa }: { estimado?: boolean; tracejada?: boolean; faixa?: boolean }) {
   return (
     <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-tinta-suave">
       <li className="flex items-center gap-1.5">
-        <span aria-hidden className="h-0.5 w-5 bg-tinta-suave" /> Valores reais
+        <span aria-hidden className="h-0.5 w-5 bg-tinta-suave" /> {estimado ? 'Estimativa do modelo' : 'Leituras do sensor'}
       </li>
       {tracejada && (
         <li className="flex items-center gap-1.5">
@@ -117,7 +117,7 @@ export function GraficoQualidade({ tanque, periodo, altura = 220 }: PropsGrafico
           altura={altura}
           formatoTempo={formatoTempo(new Date(inicio), new Date(fim))}
         />
-        <Legenda tracejada={previstos.length > 0} faixa={Boolean(faixa)} />
+        <Legenda estimado={GRANDEZAS[grandeza].estimado} tracejada={previstos.length > 0} faixa={Boolean(faixa)} />
       </div>
       <div role="group" aria-label="Grandeza exibida no gráfico" className="flex flex-col gap-1">
         {ORDEM_GRANDEZAS.map((g) => {
@@ -193,7 +193,7 @@ export function GraficosPorGrandeza({ resposta, especie, previsao, altura = 170,
                   altura={altura}
                   formatoTempo={formato}
                 />
-                <Legenda tracejada={previstos.length > 0} faixa={Boolean(faixa)} />
+                <Legenda estimado={GRANDEZAS[g].estimado} tracejada={previstos.length > 0} faixa={Boolean(faixa)} />
                 {mostrarResumo && (
                   <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-borda pt-3 text-center text-xs">
                     {(
