@@ -113,7 +113,7 @@ def _mensagem(caso: str, tanque: str, valores: dict[str, float | None], faixa: F
 
 def montar_alerta(
     caso: str,
-    id_alerta: int,
+    id_alerta: int | None,
     id_tanque: int,
     tanque: str,
     telefone: str | None,
@@ -212,9 +212,11 @@ SQL_PREVISOES = text(
 SQL_TANQUE = text(
     "SELECT t.nome, t.id_usuario, u.telefone FROM tanques t JOIN usuarios u ON u.id = t.id_usuario WHERE t.id = :t"
 )
+# nível, parâmetro e recomendação vão para o banco como foram enviados: é deles que o painel monta o alerta
 SQL_INSERIR = text(
-    "INSERT INTO alertas (id_previsao, id_tanque, id_usuario, mensagem, canal, status) "
-    "VALUES (:p, :t, :u, :m, 'whatsapp', 'pendente') RETURNING id"
+    "INSERT INTO alertas "
+    "(id_previsao, id_tanque, id_usuario, mensagem, nivel_risco, parametro, recomendacao, canal, status, criado_em) "
+    "VALUES (:p, :t, :u, :m, :nivel, :parametro, :recomendacao, 'whatsapp', 'pendente', :agora) RETURNING id"
 )
 SQL_ATUALIZAR = text("UPDATE alertas SET status = :status, ts_envio = :ts WHERE id = :id")
 
@@ -274,7 +276,10 @@ class MonitorAlertas:
 
         with engine.begin() as conn:
             tanque = conn.execute(SQL_TANQUE, {"t": id_tanque}).one()
-            mensagem = _mensagem(caso, tanque.nome, valores, faixa)
+            alerta = montar_alerta(
+                caso, None, id_tanque, tanque.nome, tanque.telefone, valores,
+                float(od.confianca) if od else None, risco, faixa, ts_leitura, agora,
+            )
             pendente = self._pendente.get(id_tanque)
             # numa nova tentativa reaproveita a linha: uma falha de rede não vira vários alertas no histórico
             if pendente and pendente[0] == caso:
@@ -282,13 +287,14 @@ class MonitorAlertas:
             else:
                 id_alerta = conn.execute(
                     SQL_INSERIR,
-                    {"p": od.id if od else None, "t": id_tanque, "u": tanque.id_usuario, "m": mensagem},
+                    {
+                        "p": od.id if od else None, "t": id_tanque, "u": tanque.id_usuario,
+                        "m": alerta["mensagem"], "nivel": alerta["nivel_risco"], "parametro": alerta["parametro"],
+                        "recomendacao": alerta["recomendacao"], "agora": agora,
+                    },
                 ).scalar_one()
+            alerta["id_alerta"] = id_alerta
 
-        alerta = montar_alerta(
-            caso, id_alerta, id_tanque, tanque.nome, tanque.telefone, valores,
-            float(od.confianca) if od else None, risco, faixa, ts_leitura, agora,
-        )
         ok = destino.enviar(alerta)
         with engine.begin() as conn:
             conn.execute(SQL_ATUALIZAR, {"status": "enviado" if ok else "falha", "ts": agora if ok else None, "id": id_alerta})

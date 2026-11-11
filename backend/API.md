@@ -49,8 +49,8 @@ Todas com prefixo `/api/v1`. Fora `/auth/login`, `/auth/refresh` e `/auth/logout
 | `GET /tanques/{id}/dispositivos` | dispositivos com sensores e o último comando do aerador (`ultimo_acionamento`) |
 | `GET /tanques/{id}/leituras` | séries por grandeza: `bucket=raw\|5m\|1h`, `desde`, `ate`, `grandezas` |
 | `GET /tanques/{id}/previsoes/atual` | último ciclo do ML: OD de agora (h = 0) e risco de 1 a 3 h |
-| `GET /alertas` | lista vazia até o sub-projeto 4 (N8N) existir |
-| `GET /eventos` | acionamentos do aerador, mais recentes primeiro (os alertas entram quando existirem) |
+| `GET /alertas` | alertas gravados pelo serviço de alertas, mais recentes primeiro: `tanque`, `status`, `desde`, `ate`, `ativos`, `pagina`, `por_pagina` |
+| `GET /eventos` | alertas e acionamentos do aerador juntos, mais recentes primeiro |
 | `GET` / `PUT /configuracoes/alertas` | **admin** · URL do webhook do N8N (`webhook_url`); vazia desliga os alertas. O serviço de alertas lê a cada ciclo |
 | `POST /tanques` | **admin** · cria o tanque e, se vier `dispositivo`, o nó com os 3 sensores, na mesma transação |
 | `PATCH /tanques/{id}` | **admin** · altera os dados do tanque; "excluir" é mudar `status` para `inativo` |
@@ -93,6 +93,14 @@ Todas com prefixo `/api/v1`. Fora `/auth/login`, `/auth/refresh` e `/auth/logout
 - **Automático × manual:** um acionamento é automático quando tem `id_previsao` (disparado por uma previsão, como o TC1 prevê para OD < 3 mg/L). Ninguém grava acionamento automático ainda.
 - **Segurança:** no broker público (`broker.hivemq.com`) qualquer um que souber o tópico aciona o relé. Para uso real, broker privado com usuário e senha.
 
+### Alertas
+
+- **Quem grava:** o serviço de alertas (`ml/src/servico/alertas.py`), ao avisar o webhook do N8N. A API só lê a tabela `alertas`.
+- **Colunas além do DDL do TC1** (migração `7c3e9a5b2f10`): `nivel_risco`, `parametro` e `recomendacao`, gravadas como foram enviadas. O painel monta o alerta a partir delas, sem interpretar o texto da mensagem.
+- **Tipos de alerta:** o serviço grava os casos críticos (pH, temperatura ou OD estimado) e um aviso de "normal" quando a condição crítica termina; esse aviso chega com nível `otimo` ou `atencao` e `parametro` nulo.
+- **`status`:** `enviado` quer dizer que o webhook do N8N respondeu com sucesso, e `ts_envio` é esse instante. A API não sabe se a mensagem chegou ao celular.
+- **`ativos=true`:** o último alerta de cada tanque, se ele é crítico e o nível atual do tanque não é `otimo` nem `atencao`. Sem previsão válida o nível atual é desconhecido, e vale o último alerta.
+
 ### Leitura
 
 - **OD:** vem da linha `h = 0` de `previsoes` (`estimado: true`). `baixa_confianca` é `confianca < ML_CONFIANCA_MIN` (0,33), como no serviço de ML.
@@ -119,7 +127,7 @@ Usam o mesmo banco de teste (`piscicultura_test`) e as mesmas fixtures dos teste
 - Confirmação do estado do relé pelo nó (hoje o painel só sabe o último comando).
 - Acionamento automático do aerador pelo OD estimado (TC1: abaixo de 3 mg/L).
 - Broker MQTT privado e com senha antes de uso real.
-- Alertas e eventos, quando o sub-projeto 4 gravar em `alertas`.
+- Confirmação de entrega do alerta no WhatsApp (hoje o `status` só reflete a resposta do webhook).
 - WebSocket (Socket.IO). Enquanto ele não existe, o painel consulta a cada 30 s.
 - Índice `previsoes (id_tanque, ts_previsao DESC)`: a busca do último ciclo hoje percorre a tabela. Basta para a escala do TCC.
 - Limite de tentativas de login.

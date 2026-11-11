@@ -10,6 +10,7 @@ from src.faixas import TILAPIA
 from src.servico.alertas import (
     CASOS,
     LEITURAS_PARA_ENCERRAR,
+    RECOMENDACOES,
     MonitorAlertas,
     Webhook,
     alerta_simulado,
@@ -71,7 +72,12 @@ class Cenario:
 
     def linhas_alertas(self):
         with self.db.connect() as conn:
-            return conn.execute(text("SELECT status, ts_envio, canal, mensagem FROM alertas ORDER BY id")).all()
+            return conn.execute(
+                text(
+                    "SELECT status, ts_envio, canal, mensagem, nivel_risco, parametro, recomendacao, criado_em "
+                    "FROM alertas ORDER BY id"
+                )
+            ).all()
 
     def previsao_od(self, valor: float, confianca: float) -> None:
         with self.db.begin() as conn:
@@ -233,6 +239,28 @@ def test_grava_o_alerta_como_enviado_no_canal_whatsapp(cenario):
     assert (linha.status, linha.canal) == ("enviado", "whatsapp")
     assert linha.ts_envio is not None
     assert "9,18" in linha.mensagem
+
+
+def test_grava_nivel_parametro_e_recomendacao_como_foram_enviados(cenario, destino):
+    for ph in (9.18, 9.18, *[8.1] * LEITURAS_PARA_ENCERRAR):
+        cenario.leitura(ph)
+    assert destino.casos == ["ph_alto", "normal"]
+    critico, normal = cenario.linhas_alertas()
+    assert (critico.nivel_risco, critico.parametro) == ("critico", "ph")
+    assert critico.recomendacao == RECOMENDACOES["ph_alto"] == destino.recebidos[0]["recomendacao"]
+    assert (normal.nivel_risco, normal.parametro) == ("otimo", None)
+    assert normal.recomendacao == RECOMENDACOES["normal"]
+    # criado e enviado no mesmo ciclo: o painel não pode mostrar um envio anterior à criação
+    assert critico.criado_em == critico.ts_envio
+    ids = [a["id_alerta"] for a in destino.recebidos]
+    assert all(isinstance(i, int) for i in ids) and ids[0] != ids[1]
+
+
+def test_alerta_do_od_grava_o_parametro_od(cenario):
+    cenario.previsao_od(3.0, 0.8)
+    cenario.leitura(7.5)
+    [linha] = cenario.linhas_alertas()
+    assert (linha.nivel_risco, linha.parametro) == ("critico", "od")
 
 
 def test_falha_no_webhook_tenta_de_novo_na_mesma_linha(cenario, destino):

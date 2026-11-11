@@ -120,7 +120,7 @@ def test_especies(autenticado, tanque):
     assert especie["od_min"] == "4.00"
 
 
-def test_alertas_vem_vazios_ate_o_sub_projeto_4(autenticado):
+def test_sem_alertas_gravados_a_lista_vem_vazia(autenticado):
     assert autenticado.get("/alertas", params={"ativos": "true"}).json() == {
         "itens": [], "total": 0, "pagina": 1, "por_pagina": 10,
     }

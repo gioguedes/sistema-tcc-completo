@@ -10,6 +10,7 @@ from pydantic import AfterValidator, BaseModel, ConfigDict
 DataHora = Annotated[datetime, AfterValidator(lambda d: d.astimezone(timezone.utc))]
 NivelRisco = Literal["otimo", "atencao", "critico"]
 Grandeza = Literal["ph", "temperatura", "turbidez", "od"]
+StatusAlerta = Literal["pendente", "enviado", "falha"]
 StatusConexao = Literal["online", "offline"]
 
 
@@ -161,11 +162,36 @@ class PrevisaoAtual(BaseModel):
     horizontes: list[PrevisaoSaida]
 
 
-class Pagina(BaseModel):
-    itens: list[dict]
+class AlertaSaida(BaseModel):
+    id: int
+    id_tanque: int
+    tanque_nome: str
+    id_previsao: int | None
+    mensagem: str
+    recomendacoes: list[str]
+    nivel_risco: NivelRisco | None
+    parametro: Grandeza | None
+    canal: Literal["whatsapp", "email", "sms"]
+    status: StatusAlerta
+    ts_envio: DataHora | None
+    criado_em: DataHora
+
+
+class PaginaAlertas(BaseModel):
+    itens: list[AlertaSaida]
     total: int
     pagina: int
     por_pagina: int
+
+
+class EventoAlerta(BaseModel):
+    tipo: Literal["alerta"] = "alerta"
+    id: str
+    id_tanque: int
+    tanque_nome: str
+    ocorrido_em: DataHora
+    nivel_risco: NivelRisco | None
+    mensagem: str
 
 
 class EventoAcionamento(BaseModel):
@@ -180,7 +206,7 @@ class EventoAcionamento(BaseModel):
 
 
 class PaginaEventos(BaseModel):
-    itens: list[EventoAcionamento]
+    itens: list[EventoAlerta | EventoAcionamento]
     total: int
     pagina: int
     por_pagina: int

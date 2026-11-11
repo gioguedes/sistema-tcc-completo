@@ -202,6 +202,46 @@ class AcionamentoAtuador(Base):
     )
 
 
+class Alerta(Base):
+    """Gravado pelo servico de alertas do ML; a API so le."""
+
+    __tablename__ = "alertas"
+    __table_args__ = (
+        CheckConstraint("canal IN ('whatsapp','email','sms')", name="ck_alert_canal"),
+        CheckConstraint("status IN ('pendente','enviado','falha')", name="ck_alert_status"),
+        CheckConstraint(
+            "nivel_risco IS NULL OR nivel_risco IN ('otimo','atencao','critico')", name="ck_alert_nivel"
+        ),
+        CheckConstraint(
+            "parametro IS NULL OR parametro IN ('ph','temperatura','turbidez','od')", name="ck_alert_param"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(always=True), primary_key=True)
+    id_previsao: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("previsoes.id", ondelete="SET NULL", name="fk_alert_prev")
+    )
+    id_tanque: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("tanques.id", ondelete="CASCADE", name="fk_alert_tanque")
+    )
+    id_usuario: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("usuarios.id", ondelete="CASCADE", name="fk_alert_usuario")
+    )
+    mensagem: Mapped[str] = mapped_column(Text)
+    canal: Mapped[str] = mapped_column(String(20), server_default="whatsapp")
+    status: Mapped[str] = mapped_column(String(20), server_default="pendente")
+    workflow_id: Mapped[str | None] = mapped_column(String(80))
+    ts_envio: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    criado_em: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=text("now()")
+    )
+    # as tres colunas abaixo nao estao no DDL do TC1 (migracao 7c3e9a5b2f10): guardam o alerta como
+    # foi enviado, para o painel nao ter de interpretar o texto da mensagem
+    nivel_risco: Mapped[str | None] = mapped_column(String(20))
+    parametro: Mapped[str | None] = mapped_column(String(30))
+    recomendacao: Mapped[str | None] = mapped_column(Text)
+
+
 class Configuracao(Base):
     __tablename__ = "configuracoes"
 
