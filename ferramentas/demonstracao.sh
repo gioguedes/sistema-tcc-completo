@@ -2,6 +2,7 @@
 # Sobe o sistema inteiro para a demonstração ao vivo, a partir da raiz do repositório, em qualquer máquina.
 # ML a cada 15 s olhando só os últimos 2 min (ML_DEMO_MINUTOS), para o painel acompanhar a troca de copo.
 # Cada serviço roda num laço: se cair, volta em 10 s (quedas em .demo_logs/reinicios.log).
+# O serviço de alertas sobe junto e só envia com a URL do webhook preenchida no painel (Configurações).
 # Uso: bash ferramentas/demonstracao.sh      Senha do painel: SENHA_PAINEL (padrão abaixo).
 R="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 L="$R/.demo_logs"; mkdir -p "$L"
@@ -41,6 +42,7 @@ sempre ingestao "$R/backend" .venv/Scripts/python.exe -u -m src.main &
 for i in $(seq 1 30); do grep -q assinando "$L/ingestao.log" 2>/dev/null && break; sleep 1; done
 sempre api "$R/backend" .venv/Scripts/python.exe -u -m src.api &
 sempre ml "$R/ml" .venv/Scripts/python.exe -u -m src.servico &
+sempre alertas "$R/ml" .venv/Scripts/python.exe -u -m src.servico.alertas &
 sempre painel "$R/dashboard" npx vite --port 5173 --strictPort &
 echo "sistema no ar: painel em http://localhost:5173 (teste@tcc.local / $SENHA_PAINEL); logs em $L"
 wait
