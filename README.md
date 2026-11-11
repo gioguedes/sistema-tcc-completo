@@ -61,7 +61,7 @@ Sem o nó físico, `backend/scripts/simular_leituras.py` publica leituras no mes
 
 ```bash
 cd backend && .venv/Scripts/python -m pytest      # 129 testes (precisam do banco e do mosquitto-test)
-cd ml && .venv/Scripts/python -m pytest           # 176 testes (criam o banco piscicultura_ml_test)
+cd ml && .venv/Scripts/python -m pytest           # 178 testes (criam o banco piscicultura_ml_test)
 cd dashboard && npm test                          # 46 testes
 ```
 

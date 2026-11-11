@@ -7,7 +7,14 @@ import pytest
 from sqlalchemy import text
 
 from src.faixas import TILAPIA
-from src.servico.alertas import CASOS, MonitorAlertas, Webhook, alerta_simulado, classificar
+from src.servico.alertas import (
+    CASOS,
+    LEITURAS_PARA_ENCERRAR,
+    MonitorAlertas,
+    Webhook,
+    alerta_simulado,
+    classificar,
+)
 from tests.banco import inserir_leituras, semear_tanque
 
 INICIO = datetime(2026, 11, 23, 19, 0, 0, tzinfo=timezone.utc)
@@ -118,6 +125,15 @@ def test_leituras_criticas_de_lados_opostos_nao_confirmam():
     assert classificar(leituras, None, TILAPIA, CONFIANCA_MIN, "normal") == "normal"
 
 
+def test_caso_critico_segue_enquanto_ha_leitura_critica_entre_as_ultimas():
+    na_faixa = [8.1] * (LEITURAS_PARA_ENCERRAR - 1)
+    temperatura = [26.0] * (LEITURAS_PARA_ENCERRAR + 1)
+    ainda = {"ph": na_faixa + [8.6], "temperatura": temperatura}
+    assert classificar(ainda, None, TILAPIA, CONFIANCA_MIN, "ph_alto") == "ph_alto"
+    encerrado = {"ph": na_faixa + [8.1, 8.6], "temperatura": temperatura}
+    assert classificar(encerrado, None, TILAPIA, CONFIANCA_MIN, "ph_alto") == "normal"
+
+
 def test_so_uma_leitura_critica_no_banco_ainda_nao_e_caso():
     assert classificar({"ph": [9.18], "temperatura": [26.0]}, None, TILAPIA, CONFIANCA_MIN, None) is None
 
@@ -179,11 +195,20 @@ def test_servico_que_sobe_com_a_agua_critica_nao_avisa_normal_antes(cenario, des
     assert destino.casos == ["ph_alto"]
 
 
-def test_uma_leitura_de_volta_a_faixa_nao_encerra_o_critico(cenario, destino):
-    for ph in (9.18, 9.18, 8.1):
+def test_o_critico_so_encerra_depois_de_cinco_leituras_seguidas_fora_dele(cenario, destino):
+    assert LEITURAS_PARA_ENCERRAR == 5
+    for ph in (9.18, 9.18, 8.1, 8.1, 8.1, 8.1):
         cenario.leitura(ph)
     assert destino.casos == ["ph_alto"]
     cenario.leitura(8.1)
+    assert destino.casos == ["ph_alto", "normal"]
+
+
+def test_agua_na_borda_que_volta_ao_critico_em_poucos_minutos_nao_repete_o_alerta(cenario, destino):
+    for ph in (8.6, 8.6, 8.4, 8.4, 8.4, 8.6, 8.6, 8.4, 8.4, 8.4, 8.4):
+        cenario.leitura(ph)
+    assert destino.casos == ["ph_alto"]
+    cenario.leitura(8.4)
     assert destino.casos == ["ph_alto", "normal"]
 
 

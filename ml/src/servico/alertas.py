@@ -3,7 +3,7 @@
 Roda fora do ciclo de ML, que no modo normal só passa a cada 5 min, e olha as leituras, e não a mediana
 do bloco. A condição crítica de pH ou temperatura só vale com duas leituras seguidas do mesmo lado da
 faixa: o alerta sai depois da segunda, ou seja, um intervalo de leitura do nó mais um ciclo deste serviço
-depois da primeira leitura crítica.
+depois da primeira leitura crítica. O caso só encerra depois de cinco leituras seguidas sem nenhuma crítica.
 """
 
 import argparse
@@ -26,6 +26,8 @@ logger = logging.getLogger(__name__)
 TEMPO_LIMITE_S = 5.0
 LEITURA_RECENTE = timedelta(minutes=10)
 PREVISAO_RECENTE = timedelta(minutes=15)
+LEITURAS_PARA_ABRIR = 2
+LEITURAS_PARA_ENCERRAR = 5
 
 # medido vem antes de estimado: o OD é uma estimativa e não deve esconder um pH fora da faixa
 GRANDEZAS_MEDIDAS = {"ph": ("ph_baixo", "ph_alto"), "temperatura": ("temperatura_baixa", "temperatura_alta")}
@@ -67,9 +69,13 @@ def classificar(
     """
     if not any(leituras.get(g) for g in GRANDEZAS_MEDIDAS):
         return None
-    recentes = {g: [_caso_da_leitura(v, g, faixa) for v in leituras.get(g, [])[:2]] for g in GRANDEZAS_MEDIDAS}
+    recentes = {
+        g: [_caso_da_leitura(v, g, faixa) for v in leituras.get(g, [])[:LEITURAS_PARA_ENCERRAR]]
+        for g in GRANDEZAS_MEDIDAS
+    }
     for casos in recentes.values():
-        if len(casos) == 2 and casos[0] is not None and casos[0] == casos[1]:
+        confirmacao = casos[:LEITURAS_PARA_ABRIR]
+        if len(confirmacao) == LEITURAS_PARA_ABRIR and casos[0] is not None and len(set(confirmacao)) == 1:
             return casos[0]
     # o OD já vem da mediana de um bloco de leituras: não precisa de segunda confirmação
     if od is not None and od[1] >= confianca_min and nivel(od[0], "od", faixa) == CRITICO:
@@ -78,7 +84,8 @@ def classificar(
     # borda sozinho. Fica o caso anterior até a leitura seguinte confirmar ou desmentir
     if any(casos and casos[0] is not None for casos in recentes.values()):
         return anterior
-    # uma leitura só de volta à faixa também não encerra: um sensor oscilando na borda daria um alerta por minuto
+    # e o caso só encerra sem nenhuma leitura crítica entre as últimas LEITURAS_PARA_ENCERRAR: com a água na
+    # borda do limite, sair e voltar em poucos minutos viraria um par de mensagens a cada oscilação
     if any(recentes.get(GRANDEZA_DO_CASO.get(anterior), [])):
         return anterior
     return "normal"
@@ -188,7 +195,7 @@ SQL_LEITURAS = text(
           AND tp.grandeza IN ('ph', 'temperatura')
           AND l.ts >= :desde AND l.ts <= :agora
     ) x
-    WHERE ordem <= 2
+    WHERE ordem <= :n
     ORDER BY grandeza, ts DESC
     """
 )
@@ -299,7 +306,8 @@ class MonitorAlertas:
         leituras: dict[str, list[float]] = {}
         mais_recente = None
         for grandeza, ts, valor in conn.execute(
-            SQL_LEITURAS, {"t": id_tanque, "desde": agora - LEITURA_RECENTE, "agora": agora}
+            SQL_LEITURAS,
+            {"t": id_tanque, "desde": agora - LEITURA_RECENTE, "agora": agora, "n": LEITURAS_PARA_ENCERRAR},
         ):
             leituras.setdefault(grandeza, []).append(float(valor))
             mais_recente = max(mais_recente, ts) if mais_recente else ts
