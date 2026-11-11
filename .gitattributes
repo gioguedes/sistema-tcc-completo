@@ -1,0 +1,2 @@
+# os scripts rodam no bash do Git: se o git do Windows os gravar com CRLF, o bash para em "\r: command not found"
+*.sh text eol=lf
