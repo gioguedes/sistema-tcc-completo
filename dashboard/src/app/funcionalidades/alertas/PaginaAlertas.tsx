@@ -53,7 +53,8 @@ export default function PaginaAlertas() {
         )}
         {ativos.data && ativosFiltrados.length === 0 && (
           <Aviso tom="otimo" titulo="Nenhum tanque pede ação agora.">
-            Os alertas aparecem aqui assim que a previsão indicar atenção ou risco crítico.
+            Os alertas aparecem aqui quando o pH, a temperatura ou o oxigênio estimado de um tanque entram na
+            faixa crítica.
           </Aviso>
         )}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -18,6 +18,15 @@ const COR_PONTO: Record<NivelRisco, string> = {
   critico: 'bg-critico',
 }
 
+const TITULO_ALERTA: Record<NivelRisco, string> = {
+  critico: 'Alerta crítico',
+  atencao: 'Atenção',
+  otimo: 'Condição normal',
+}
+
+/** O serviço de alertas também avisa quando a condição crítica termina: esse aviso chega com nível ótimo ou atenção. */
+const tituloAlerta = (nivel: NivelRisco | null) => (nivel ? TITULO_ALERTA[nivel] : 'Alerta')
+
 interface PropsBotaoAerador {
   tanqueNome: string
   dispositivo: ResumoDispositivo | undefined
@@ -116,7 +125,10 @@ export function CartaoAlerta({ alerta, dispositivo, agora, titulo: Titulo = 'h3'
   )
 }
 
-/** Status de envio pelo WhatsApp, com o tempo até o envio (RNF01: até 60 s). */
+/**
+ * Status de envio pelo WhatsApp. Sem o tempo até o envio: o banco guarda o instante em que o webhook
+ * aceitou o alerta, não o do cruzamento do limite nem o da chegada ao celular (RNF01).
+ */
 export function StatusEnvio({ alerta }: { alerta: Alerta }) {
   if (alerta.status === 'falha') {
     return (
@@ -132,10 +144,9 @@ export function StatusEnvio({ alerta }: { alerta: Alerta }) {
       </Etiqueta>
     )
   }
-  const segundos = Math.round((Date.parse(alerta.ts_envio) - Date.parse(alerta.criado_em)) / 1000)
   return (
     <Etiqueta tom="otimo" icone={CheckCheck}>
-      {ROTULO_STATUS_ALERTA.enviado} via {ROTULO_CANAL[alerta.canal]} em {segundos} s
+      {ROTULO_STATUS_ALERTA.enviado} via {ROTULO_CANAL[alerta.canal]}
     </Etiqueta>
   )
 }
@@ -150,7 +161,7 @@ export function ItemAlerta({ alerta, agora }: { alerta: Alerta; agora: number })
         />
         <div className="min-w-0">
           <p className="text-sm font-semibold">
-            {alerta.nivel_risco === 'critico' ? 'Alerta crítico' : 'Atenção'} — {alerta.tanque_nome}
+            {tituloAlerta(alerta.nivel_risco)} — {alerta.tanque_nome}
           </p>
           <p className="text-sm text-tinta-suave">{alerta.mensagem}</p>
           <time dateTime={alerta.criado_em} className="text-xs text-tinta-suave">
@@ -171,7 +182,7 @@ export function ItemEventoFeed({ evento, agora }: { evento: Evento; agora: numbe
       <ItemEvento
         cor={evento.nivel_risco ? COR_PONTO[evento.nivel_risco] : 'bg-neutro'}
         momento={formatarMomento(evento.ocorrido_em, agora)}
-        titulo={`${evento.nivel_risco === 'critico' ? 'Alerta crítico' : 'Atenção'} — ${evento.tanque_nome}`}
+        titulo={`${tituloAlerta(evento.nivel_risco)} — ${evento.tanque_nome}`}
         descricao={evento.mensagem}
       />
     )
