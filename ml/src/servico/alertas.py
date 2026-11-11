@@ -10,6 +10,7 @@ import argparse
 import json
 import logging
 import time
+import urllib.error
 import urllib.request
 from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
@@ -177,8 +178,10 @@ class Webhook:
             with urllib.request.urlopen(pedido, timeout=TEMPO_LIMITE_S) as resposta:
                 return 200 <= resposta.status < 300
         except (OSError, ValueError) as erro:
-            # sem a URL no log: quem tem a URL de um webhook consegue disparar o workflow
-            logger.warning("webhook de alertas falhou: %s", type(erro).__name__)
+            # sem a URL no log: quem tem a URL de um webhook consegue disparar o workflow.
+            # O código HTTP entra porque diz o que acertar no N8N (404: workflow inativo ou caminho errado)
+            detalhe = f"HTTP {erro.code}" if isinstance(erro, urllib.error.HTTPError) else type(erro).__name__
+            logger.warning("webhook de alertas falhou: %s", detalhe)
             return False
 
 

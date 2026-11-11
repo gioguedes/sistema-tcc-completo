@@ -426,12 +426,14 @@ def test_webhook_sem_token_nao_manda_o_cabecalho():
 
 
 @pytest.mark.parametrize("status", [404, 500])
-def test_resposta_de_erro_conta_como_falha(status):
+def test_resposta_de_erro_conta_como_falha_e_o_log_diz_o_codigo_sem_a_url(status, caplog):
     servidor = _Servidor(status)
     try:
         assert Webhook(servidor.url).enviar({}) is False
     finally:
         servidor.fechar()
+    assert f"HTTP {status}" in caplog.text
+    assert servidor.url not in caplog.text
 
 
 def test_servidor_fora_do_ar_conta_como_falha_e_nao_expoe_a_url(caplog):
