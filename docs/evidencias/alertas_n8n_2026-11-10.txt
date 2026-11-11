@@ -1,0 +1,184 @@
+ALERTAS: PRIMEIRO ALERTA REAL ENTREGUE AO N8N (10/11/2026)
+==========================================================
+
+Condições
+---------
+- Sistema completo em operação no notebook do projeto (ferramentas/demonstracao.sh), com a migração
+  7c3e9a5b2f10 aplicada e o serviço de alertas (ml/src/servico/alertas.py) em ciclo de 15 s.
+- Nó sensor real em um recipiente com água: temperatura 19,13 °C e pH de 7,94 a 8,02.
+- Faixa da espécie cadastrada (tilápia-do-nilo): temperatura de 20 a 30 °C. Abaixo de 20 °C o nível é crítico.
+- Horários do log no fuso de Brasília (UTC-3); horários do banco em UTC. O relógio do notebook estava
+  4,3 s adiantado em relação ao NTP (w32tm /stripchart, 22:23).
+
+O que foi verificado
+--------------------
+- O serviço classificou o tanque como "temperatura_baixa" e gravou o alerta na tabela alertas.
+- O N8N recusou as 25 primeiras tentativas com HTTP 404: primeiro o endereço salvo no painel não era o do
+  workflow; depois o nó Webhook aceitava só GET. Corrigidos o endereço (no painel) e o método (no N8N),
+  a tentativa seguinte foi aceita. O serviço repete o envio a cada ciclo, sem intervenção.
+- O N8N recebeu o alerta em modo de produção ("executionMode": "production"), com o corpo abaixo.
+- O painel mostrou o alerta como ativo e no histórico (GET /api/v1/alertas), com a situação do envio.
+
+O que NÃO foi verificado
+------------------------
+- O envio da mensagem ao WhatsApp pela Evolution API (o workflow do N8N não estava concluído).
+- O tempo entre o cruzamento do limite e a mensagem (RNF01). O alerta ficou pendente por cerca de 6 min
+  por causa da configuração do webhook, então este registro não mede latência.
+- O campo "telefone" foi vazio: o usuário dono do tanque não tinha telefone cadastrado.
+
+Log do serviço de alertas (.demo_logs/alertas.log; a URL do webhook não é registrada)
+--------------------------------------------------------------------------------------
+2026-11-10 22:24:23,438 INFO servico de alertas iniciado, ciclo a cada 15 s
+2026-11-10 22:24:24,211 WARNING webhook de alertas falhou: HTTPError
+2026-11-10 22:24:24,230 WARNING tanque 1: alerta 1 nao enviado (temperatura_baixa); tenta no proximo ciclo
+[... 5 tentativas recusadas, entre 22:24:39 e 22:25:41, omitidas ...]
+2026-11-10 22:25:55,506 INFO servico de alertas iniciado, ciclo a cada 15 s
+2026-11-10 22:25:56,076 WARNING webhook de alertas falhou: HTTP 404
+2026-11-10 22:25:56,085 WARNING tanque 1: alerta 2 nao enviado (temperatura_baixa); tenta no proximo ciclo
+[... 17 tentativas recusadas com HTTP 404, entre 22:26:11 e 22:30:19, omitidas ...]
+2026-11-10 22:30:34,874 WARNING webhook de alertas falhou: HTTP 404
+2026-11-10 22:30:34,882 WARNING tanque 1: alerta 2 nao enviado (temperatura_baixa); tenta no proximo ciclo
+2026-11-10 22:30:50,593 INFO tanque 1: alerta 2 enviado (temperatura_baixa)
+
+A primeira linha "iniciado" é a subida do sistema; a segunda é um reinício só do serviço de alertas, feito
+para ele passar a registrar o código HTTP da recusa. Por isso há duas linhas em alertas: a 1 ficou como
+falha e a 2 foi a entregue.
+
+Tabela alertas depois do envio
+------------------------------
+-[ RECORD 1 ]+---------------------------------------------------------------------------------
+id           | 1
+id_tanque    | 1
+status       | falha
+nivel_risco  | critico
+parametro    | temperatura
+canal        | whatsapp
+criado_em    | 2026-11-11 01:24:23.438787+00
+ts_envio     | 
+mensagem     | Tanque bancada TCC: risco crítico. Temperatura 19,1 °C, abaixo de 20,0 °C.
+recomendacao | Confira o sensor. Se confirmar, proteja o tanque do frio e reduza a alimentação.
+-[ RECORD 2 ]+---------------------------------------------------------------------------------
+id           | 2
+id_tanque    | 1
+status       | enviado
+nivel_risco  | critico
+parametro    | temperatura
+canal        | whatsapp
+criado_em    | 2026-11-11 01:25:55.50668+00
+ts_envio     | 2026-11-11 01:30:49.88323+00
+mensagem     | Tanque bancada TCC: risco crítico. Temperatura 19,1 °C, abaixo de 20,0 °C.
+recomendacao | Confira o sensor. Se confirmar, proteja o tanque do frio e reduza a alimentação.
+
+Corpo recebido pelo N8N (saída do nó Webhook; cabeçalhos e endereço omitidos)
+-----------------------------------------------------------------------------
+{
+  "evento": "alerta_qualidade_agua",
+  "simulado": false,
+  "id_alerta": 2,
+  "caso": "temperatura_baixa",
+  "nivel_risco": "critico",
+  "parametro": "temperatura",
+  "valor": 19.13,
+  "unidade": "°C",
+  "faixa_min": 20,
+  "faixa_max": 30,
+  "id_tanque": 1,
+  "tanque": "Tanque bancada TCC",
+  "telefone": null,
+  "mensagem": "Tanque bancada TCC: risco crítico. Temperatura 19,1 °C, abaixo de 20,0 °C.",
+  "recomendacao": "Confira o sensor. Se confirmar, proteja o tanque do frio e reduza a alimentação.",
+  "ph": 8,
+  "temperatura": 19.13,
+  "od_estimado": null,
+  "od_confianca": null,
+  "risco_previsto": {},
+  "ts_leitura": "2026-11-11T01:30:43+00:00",
+  "ts_disparo": "2026-11-11T01:30:49.883230+00:00"
+}
+
+"od_estimado" e "risco_previsto" vieram vazios porque o serviço de ML ainda não tinha os 45 min de leituras
+seguidas de que precisa: o computador ficou sem gravar leituras das 18:34 às 21:55 desse dia.
+
+
+REGRA DE ALERTAS REEXECUTADA SOBRE AS LEITURAS DO ENSAIO EM ÁGUA (04 a 07/11/2026)
+==================================================================================
+
+A função classificar() do serviço foi aplicada, leitura por leitura, à série de 4.102 instantes do ensaio
+(68 h 29 min), como se o serviço estivesse ligado. Nenhum alerta foi enviado nesse ensaio: é uma simulação.
+
+Regra antiga (uma leitura crítica abre o alerta) contra a de abrir com duas leituras críticas seguidas:
+
+série: 4102 instantes; limiar de confiança do OD: 0.33
+leituras de pH fora de 6,5 a 8,5: 22, em 9 sequências seguidas de tamanho [6, 3, 3, 3, 2, 2, 1, 1, 1]
+temperatura fora de 20 a 30 °C: 0 leituras
+== regra antiga (uma leitura crítica): 13 mensagens; por caso: {'normal': 7, 'ph_alto': 6}
+    04/11 21:24  normal   pH 8.16
+    04/11 22:24  ph_alto  pH 8.51 | até o 'normal': 13 leituras, 10 acima de 8,5, máximo 8.58
+    04/11 22:37  normal   pH 8.50
+    06/11 05:30  ph_alto  pH 8.51 | até o 'normal': 2 leituras, 1 acima de 8,5, máximo 8.51
+    06/11 05:32  normal   pH 8.37
+    06/11 06:21  ph_alto  pH 8.52 | até o 'normal': 2 leituras, 1 acima de 8,5, máximo 8.52
+    06/11 06:23  normal   pH 8.34
+    06/11 06:31  ph_alto  pH 8.51 | até o 'normal': 3 leituras, 2 acima de 8,5, máximo 8.53
+    06/11 06:34  normal   pH 8.47
+    06/11 07:16  ph_alto  pH 8.71 | até o 'normal': 7 leituras, 5 acima de 8,5, máximo 8.71
+    06/11 07:23  normal   pH 8.48
+    06/11 07:24  ph_alto  pH 8.55 | até o 'normal': 4 leituras, 3 acima de 8,5, máximo 8.55
+    06/11 07:28  normal   pH 8.44
+== regra nova (duas leituras críticas seguidas): 9 mensagens; por caso: {'normal': 5, 'ph_alto': 4}
+    04/11 21:24  normal   pH 8.16
+    04/11 22:27  ph_alto  pH 8.57 | até o 'normal': 10 leituras, 8 acima de 8,5, máximo 8.58
+    04/11 22:37  normal   pH 8.50
+    06/11 06:32  ph_alto  pH 8.53 | até o 'normal': 2 leituras, 1 acima de 8,5, máximo 8.53
+    06/11 06:34  normal   pH 8.47
+    06/11 07:17  ph_alto  pH 8.68 | até o 'normal': 6 leituras, 4 acima de 8,5, máximo 8.68
+    06/11 07:23  normal   pH 8.48
+    06/11 07:25  ph_alto  pH 8.53 | até o 'normal': 3 leituras, 2 acima de 8,5, máximo 8.53
+    06/11 07:28  normal   pH 8.44
+
+Regra final: abre com duas leituras críticas seguidas e encerra sem nenhuma crítica entre as últimas N.
+O serviço usa N = 5; de 3 a 10 o resultado nesta série é o mesmo.
+
+série: 4102 instantes; abre com 2 leituras críticas seguidas; padrão do código para encerrar: 5
+== encerra com  2 leituras fora do crítico: 9 mensagens, 4 críticas; minutos até o 'normal': [10, 2, 6, 3]
+      04/11 21:24  normal   pH 8.16
+      04/11 22:27  ph_alto  pH 8.57
+      04/11 22:37  normal   pH 8.50
+      06/11 06:32  ph_alto  pH 8.53
+      06/11 06:34  normal   pH 8.47
+      06/11 07:17  ph_alto  pH 8.68
+      06/11 07:23  normal   pH 8.48
+      06/11 07:25  ph_alto  pH 8.53
+      06/11 07:28  normal   pH 8.44
+== encerra com  3 leituras fora do crítico: 7 mensagens, 3 críticas; minutos até o 'normal': [11, 3, 12]
+      04/11 21:24  normal   pH 8.16
+      04/11 22:27  ph_alto  pH 8.57
+      04/11 22:38  normal   pH 8.50
+      06/11 06:32  ph_alto  pH 8.53
+      06/11 06:35  normal   pH 8.41
+      06/11 07:17  ph_alto  pH 8.68
+      06/11 07:29  normal   pH 8.41
+== encerra com  5 leituras fora do crítico: 7 mensagens, 3 críticas; minutos até o 'normal': [13, 5, 14]
+      04/11 21:24  normal   pH 8.16
+      04/11 22:27  ph_alto  pH 8.57
+      04/11 22:40  normal   pH 8.48
+      06/11 06:32  ph_alto  pH 8.53
+      06/11 06:37  normal   pH 8.48
+      06/11 07:17  ph_alto  pH 8.68
+      06/11 07:31  normal   pH 8.44
+== encerra com  8 leituras fora do crítico: 7 mensagens, 3 críticas; minutos até o 'normal': [16, 8, 17]
+      04/11 21:24  normal   pH 8.16
+      04/11 22:27  ph_alto  pH 8.57
+      04/11 22:43  normal   pH 8.40
+      06/11 06:32  ph_alto  pH 8.53
+      06/11 06:40  normal   pH 8.40
+      06/11 07:17  ph_alto  pH 8.68
+      06/11 07:34  normal   pH 8.33
+== encerra com 10 leituras fora do crítico: 7 mensagens, 3 críticas; minutos até o 'normal': [18, 10, 19]
+      04/11 21:24  normal   pH 8.16
+      04/11 22:27  ph_alto  pH 8.57
+      04/11 22:45  normal   pH 8.32
+      06/11 06:32  ph_alto  pH 8.53
+      06/11 06:42  normal   pH 8.34
+      06/11 07:17  ph_alto  pH 8.68
+      06/11 07:36  normal   pH 8.46
